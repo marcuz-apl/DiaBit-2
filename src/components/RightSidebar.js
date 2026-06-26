@@ -27,7 +27,7 @@ export default function RightSidebar({
   const [glElevation, setGlElevation] = useState(0);
   const [declination, setDeclination] = useState(0);
   const [gravityField, setGravityField] = useState(980.665);
-  const [gravityModel, setGravityModel] = useState('GARM');
+  const [gravityModel, setGravityModel] = useState('WGS84');
   const [magneticField, setMagneticField] = useState(50000);
   const [magneticDip, setMagneticDip] = useState(60);
   const [declinationDate, setDeclinationDate] = useState('');
@@ -38,6 +38,10 @@ export default function RightSidebar({
   // States for reference models from API
   const [gravityModels, setGravityModels] = useState([]);
   const [magneticModels, setMagneticModels] = useState([]);
+
+  // States for save confirmation messages in client UI
+  const [saveMessage, setSaveMessage] = useState(null);
+  const [saveError, setSaveError] = useState(false);
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -148,7 +152,7 @@ export default function RightSidebar({
       setGlElevation(meta.gl_elevation || 0);
       setDeclination(meta.declination || 0);
       setGravityField(meta.gravity_field || 980.665);
-      setGravityModel(meta.gravity_model || 'GARM');
+      setGravityModel(meta.gravity_model || 'WGS84');
       setMagneticField(meta.magnetic_field || 50000);
       setMagneticDip(meta.magnetic_dip || 60);
       setDeclinationDate(meta.declination_date || '');
@@ -263,9 +267,13 @@ export default function RightSidebar({
 
       // Trigger app refresh
       onUpdateSettings();
-      alert("Settings saved. Calculating directional path...");
+      setSaveMessage('Settings saved — recalculating directional path...');
+      setSaveError(false);
+      setTimeout(() => setSaveMessage(null), 4000);
     } catch (e) {
-      alert("Error: " + e.message);
+      setSaveMessage('Error: ' + e.message);
+      setSaveError(true);
+      setTimeout(() => setSaveMessage(null), 6000);
     } finally {
       setIsSaving(false);
     }
@@ -713,10 +721,24 @@ export default function RightSidebar({
               )}
             </div>
 
+            {/* In-sidebar save feedback toast */}
+            {saveMessage && (
+              <div
+                className={`mt-4 flex items-start gap-2 rounded-lg px-3 py-2.5 text-xs font-medium leading-snug shadow-md transition-all ${
+                  saveError
+                    ? 'bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/60 dark:border-red-800 dark:text-red-300'
+                    : 'bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300'
+                }`}
+              >
+                <span className="mt-px text-base leading-none">{saveError ? '✕' : '✓'}</span>
+                <span>{saveMessage}</span>
+              </div>
+            )}
+
             <button
               onClick={handleSaveSettings}
               disabled={isSaving}
-              className="mt-6 flex items-center justify-center gap-1.5 w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded shadow transition shrink-0"
+              className="mt-3 flex items-center justify-center gap-1.5 w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded shadow transition shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Save className="h-4 w-4" />
               {isSaving ? "Saving..." : "Save Settings"}

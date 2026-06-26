@@ -119,7 +119,7 @@ export default function HelpPage() {
             </div>
 
             <div className="bg-white border border-slate-200 dark:border-slate-800 dark:bg-slate-900 rounded-xl p-4 shadow-sm text-xs space-y-3">
-              <h3 className="font-semibold text-slate-800 dark:text-slate-200">Gravity Reference Models (GARM, WGS84)</h3>
+              <h3 className="font-semibold text-slate-800 dark:text-slate-200">Gravity Reference Models (WGS84, EGM2008, GRS80)</h3>
               <p className="text-slate-650 dark:text-slate-400 leading-relaxed">
                 Standard gravity models calculate the expected reference gravity field (G_ref) as a function of latitude and elevation.
               </p>

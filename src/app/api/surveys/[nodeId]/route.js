@@ -33,7 +33,7 @@ function getWellSettings(nodeId) {
       gl_elevation: wellMetadata.gl_elevation || 0,
       declination: wellMetadata.declination || 0,
       gravity_field: wellMetadata.gravity_field || 980.665,
-      gravity_model: wellMetadata.gravity_model || 'GARM',
+      gravity_model: wellMetadata.gravity_model || 'WGS84',
       magnetic_field: wellMetadata.magnetic_field || 50000,
       magnetic_dip: wellMetadata.magnetic_dip || 60,
       declination_date: wellMetadata.declination_date || '',

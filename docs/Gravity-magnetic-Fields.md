@@ -26,7 +26,7 @@ Accelerometers measure the local gravity vector $\mathbf{G} = (G_x, G_y, G_z)$. 
 ### Gravity Models
 - **WGS84 / Somigliana Equation:** Computes theoretical gravity as a function of latitude ($\phi$):
   $$g(\phi) = 9.780327 \left(1 + 0.0053024 \sin^2\phi - 0.0000058 \sin^2 2\phi\right) \text{ m/s}^2$$
-- **Geodetic Reference System / Gravity Anomaly Reference Model (GARM):** Calculates reference gravity field strength ($G_{\text{ref}}$) at the well site, typically calibrated near $980.665 \text{ mGal}$ ($1.0 \text{ g}$).
+- **GRS80 / Normal Gravity Formula:** An alternative reference ellipsoid that computes theoretical gravity as a function of latitude. Provides slightly different coefficients from WGS84 but converges to the same standard value of $980.665 \text{ mGal}$ at standard conditions.
 
 ---
 
