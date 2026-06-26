@@ -20,6 +20,104 @@ export default function LeftSidebar({
   const [newNodeType, setNewNodeType] = useState('');
   const idleTimerRef = useRef(null);
 
+  const [width, setWidth] = useState(256);
+  const [isResizing, setIsResizing] = useState(false);
+  const isResizingRef = useRef(false);
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, node: null });
+
+  useEffect(() => {
+    const handleCloseMenu = () => {
+      setContextMenu(prev => prev.visible ? { ...prev, visible: false } : prev);
+    };
+    window.addEventListener('click', handleCloseMenu);
+    return () => {
+      window.removeEventListener('click', handleCloseMenu);
+    };
+  }, []);
+
+  const isNodeDefinitive = (node) => {
+    if (node.type !== 'trajectory' && node.type !== 'survey') return false;
+    
+    // Check if explicitly marked
+    if (node.metadata?.is_definitive === true || node.metadata?.is_definitive === 'true') {
+      return true;
+    }
+    
+    // Check if it's the only one of its type under the parent slot
+    const siblings = nodes.filter(n => n.parent_id === node.parent_id && n.type === node.type);
+    if (siblings.length === 1 && siblings[0].id === node.id) {
+      return true;
+    }
+    
+    // If there are multiple and none are explicitly marked, and this is the first one:
+    const hasAnyDefinitive = siblings.some(n => n.metadata?.is_definitive === true || n.metadata?.is_definitive === 'true');
+    if (!hasAnyDefinitive && siblings[0].id === node.id) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  const handleSetDefinitive = async (node) => {
+    try {
+      const siblings = nodes.filter(n => n.parent_id === node.parent_id && n.type === node.type && n.id !== node.id);
+      
+      // Update targeted node to definitive
+      const res = await fetch(`/api/nodes/${node.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metadata: { is_definitive: true } })
+      });
+      if (!res.ok) throw new Error("Failed to update definitive status");
+
+      // Update all siblings to non-definitive
+      await Promise.all(siblings.map(sib => 
+        fetch(`/api/nodes/${sib.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ metadata: { is_definitive: false } })
+        })
+      ));
+
+      fetchNodes();
+    } catch (err) {
+      alert("Error setting definitive: " + err.message);
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizingRef.current) return;
+      const newWidth = Math.max(160, Math.min(600, e.clientX));
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        setIsResizing(false);
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const startResizing = (e) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    setIsResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
   // Load nodes from API
   const fetchNodes = async () => {
     try {
@@ -76,6 +174,10 @@ export default function LeftSidebar({
   const getParentChain = (flatNodes, targetId) => {
     const chain = [];
     let current = flatNodes.find(n => n.id === targetId);
+    if (current && (current.type === 'trajectory' || current.type === 'survey')) {
+      const folderSuffix = current.type === 'trajectory' ? 'plans' : 'surveys';
+      chain.push(`slot-${current.parent_id}-${folderSuffix}`);
+    }
     while (current && current.parent_id) {
       chain.push(current.parent_id);
       current = flatNodes.find(n => n.id === current.parent_id);
@@ -87,10 +189,34 @@ export default function LeftSidebar({
   const buildTree = (parentId = null) => {
     return nodes
       .filter(n => n.parent_id === parentId)
-      .map(n => ({
-        ...n,
-        children: buildTree(n.id)
-      }));
+      .map(n => {
+        const rawChildren = buildTree(n.id);
+        if (n.type === 'slot') {
+          return {
+            ...n,
+            children: [
+              {
+                id: `slot-${n.id}-plans`,
+                parent_id: n.id,
+                name: 'Plans',
+                type: 'plans_folder',
+                children: rawChildren.filter(c => c.type === 'trajectory')
+              },
+              {
+                id: `slot-${n.id}-surveys`,
+                parent_id: n.id,
+                name: 'Surveys',
+                type: 'surveys_folder',
+                children: rawChildren.filter(c => c.type === 'survey')
+              }
+            ]
+          };
+        }
+        return {
+          ...n,
+          children: rawChildren
+        };
+      });
   };
 
   const toggleExpand = (id) => {
@@ -127,7 +253,12 @@ export default function LeftSidebar({
         const addedNode = await res.json();
         // Expand the parent so the new node is visible
         if (parentId) {
-          setExpandedNodes(prev => ({ ...prev, [parentId]: true }));
+          const folderSuffix = addedNode.type === 'trajectory' ? 'plans' : 'surveys';
+          setExpandedNodes(prev => ({
+            ...prev,
+            [parentId]: true,
+            [`slot-${parentId}-${folderSuffix}`]: true
+          }));
         }
         setNewNodeName('');
         setShowAddForm(null);
@@ -170,8 +301,16 @@ export default function LeftSidebar({
       case 'slot': return <Activity className="h-4 w-4 text-purple-500 shrink-0" />;
       case 'trajectory': return <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />;
       case 'survey': return <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />;
+      case 'plans_folder': return <Folder className="h-4 w-4 text-emerald-500/80 dark:text-emerald-400/80 shrink-0" />;
+      case 'surveys_folder': return <Folder className="h-4 w-4 text-blue-500/80 dark:text-blue-400/80 shrink-0" />;
       default: return <FileText className="h-4 w-4 shrink-0" />;
     }
+  };
+
+  const getFriendlyTypeName = (type) => {
+    if (type === 'trajectory') return 'Plan';
+    if (type === 'survey') return 'Actual Survey';
+    return type;
   };
 
   const getChildTypeNeeded = (parentType) => {
@@ -181,6 +320,8 @@ export default function LeftSidebar({
       case 'basin': return 'field';
       case 'field': return 'well';
       case 'well': return 'slot';
+      case 'plans_folder': return 'trajectory';
+      case 'surveys_folder': return 'survey';
       default: return 'trajectory'; // Slot gets Trajectory Plan or Deviation Survey
     }
   };
@@ -198,10 +339,22 @@ export default function LeftSidebar({
         {/* Row element */}
         <div 
           onClick={() => {
-            if (isLeaf) {
+            if (isLeaf || node.type === 'slot') {
               onSelectNode(node);
-            } else {
+            }
+            if (!isLeaf) {
               toggleExpand(node.id);
+            }
+          }}
+          onContextMenu={(e) => {
+            if (node.type === 'trajectory' || node.type === 'survey') {
+              e.preventDefault();
+              setContextMenu({
+                visible: true,
+                x: e.clientX,
+                y: e.clientY,
+                node: node
+              });
             }
           }}
           className={`flex items-center justify-between group py-1 px-1.5 rounded-lg cursor-pointer transition ${
@@ -218,11 +371,14 @@ export default function LeftSidebar({
             )}
             {getNodeIcon(node.type)}
             <span className="truncate text-xs">{node.name}</span>
+            {isNodeDefinitive(node) && (
+              <span className="text-[10px] text-amber-500 font-bold shrink-0 ml-1.5" title="Definitive">★</span>
+            )}
           </div>
 
           {/* Action buttons on hover (Admin or node creation) */}
           <div className="hidden group-hover:flex items-center gap-1 shrink-0">
-            {node.type !== 'trajectory' && node.type !== 'survey' && (
+            {node.type !== 'trajectory' && node.type !== 'survey' && node.type !== 'slot' && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -230,13 +386,13 @@ export default function LeftSidebar({
                   setNewNodeName('');
                   setNewNodeType(childType);
                 }}
-                title={`Add ${childType}`}
+                title={`Add ${getFriendlyTypeName(childType)}`}
                 className="p-0.5 rounded text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
               >
                 <Plus className="h-3 w-3" />
               </button>
             )}
-            {(isAdmin || node.type === 'trajectory' || node.type === 'survey' || node.type === 'well' || node.type === 'slot') && (
+            {node.type !== 'plans_folder' && node.type !== 'surveys_folder' && (isAdmin || node.type === 'trajectory' || node.type === 'survey' || node.type === 'well' || node.type === 'slot') && (
               <button
                 onClick={(e) => handleDeleteNode(node.id, e)}
                 title="Delete"
@@ -251,33 +407,20 @@ export default function LeftSidebar({
         {/* Inline sub-node creation form */}
         {showAddForm === node.id && (
           <div className="mt-1 pl-6 pr-2 py-1 bg-slate-50 dark:bg-slate-900 rounded-lg flex flex-col gap-1 border border-slate-200 dark:border-slate-800">
-            {node.type === 'slot' ? (
-              <div className="flex gap-1 text-[10px]">
-                <button 
-                  onClick={() => setNewNodeType('trajectory')}
-                  className={`px-1.5 py-0.5 rounded ${newNodeType === 'trajectory' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
-                >
-                  Plan
-                </button>
-                <button 
-                  onClick={() => setNewNodeType('survey')}
-                  className={`px-1.5 py-0.5 rounded ${newNodeType === 'survey' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
-                >
-                  Actual
-                </button>
-              </div>
-            ) : null}
             <div className="flex gap-1">
               <input
                 type="text"
                 autoFocus
-                placeholder={`New ${newNodeType || childType}...`}
+                placeholder={`New ${getFriendlyTypeName(childType)} name...`}
                 value={newNodeName}
                 onChange={(e) => setNewNodeName(e.target.value)}
                 className="flex-1 text-xs py-0.5 px-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded outline-none text-slate-800 dark:text-slate-100"
               />
               <button
-                onClick={() => handleAddNode(node.id, newNodeType || childType)}
+                onClick={() => {
+                  const dbParentId = (node.type === 'plans_folder' || node.type === 'surveys_folder') ? node.parent_id : node.id;
+                  handleAddNode(dbParentId, childType);
+                }}
                 className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] hover:bg-blue-500 transition font-medium"
               >
                 Add
@@ -300,9 +443,10 @@ export default function LeftSidebar({
 
   return (
     <div 
-      className={`relative h-full border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:backdrop-blur-md transition-all duration-300 z-30 flex flex-col ${
-        isOpen ? 'w-64' : 'w-4'
-      }`}
+      className={`relative h-full border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:backdrop-blur-md z-30 flex flex-col ${
+        isOpen ? '' : 'w-4'
+      } ${isResizing ? '' : 'transition-all duration-300'}`}
+      style={isOpen ? { width: `${width}px` } : {}}
     >
       {/* Expand/Collapse Hover Trigger */}
       {!isOpen && (
@@ -372,6 +516,34 @@ export default function LeftSidebar({
           )}
         </div>
       </div>
+
+      {/* Resize Handle */}
+      {isOpen && (
+        <div
+          onMouseDown={startResizing}
+          className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-blue-500/20 active:bg-blue-600/30 transition-colors z-40 group"
+          title="Drag to resize sidebar"
+        >
+          <div className="absolute right-0 top-0 w-[1.5px] h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors" />
+        </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <div 
+          className="fixed bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl py-1 z-50 text-xs w-44 text-slate-700 dark:text-slate-200"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button
+            onClick={() => {
+              handleSetDefinitive(contextMenu.node);
+            }}
+            className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-2 font-medium"
+          >
+            <span className="text-amber-500 font-bold text-sm">★</span> Set as Definitive
+          </button>
+        </div>
+      )}
     </div>
   );
 }
