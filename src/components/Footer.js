@@ -23,7 +23,7 @@ export default function Footer() {
 
           {/* Center: Copyright */}
           <div className="text-slate-500 dark:text-slate-400 font-medium text-center">
-            &copy; 2026 All rights reserved by Alfazen Inc.
+            @{new Date().getFullYear()} Alfazen Inc. All rights reserved
           </div>
 
           {/* Right Corner: Social Links */}
