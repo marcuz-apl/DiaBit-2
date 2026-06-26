@@ -18,6 +18,173 @@ export default function Home() {
   const [chartSurveyPoints, setChartSurveyPoints] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [autoSaveMinutes, setAutoSaveMinutes] = useState(3);
+
+  const activeNodeRef = React.useRef(activeNode);
+  const nodesRef = React.useRef(nodes);
+  const planPointsRef = React.useRef(planPoints);
+  const surveyPointsRef = React.useRef(surveyPoints);
+
+  React.useEffect(() => {
+    activeNodeRef.current = activeNode;
+  }, [activeNode]);
+
+  React.useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  React.useEffect(() => {
+    planPointsRef.current = planPoints;
+  }, [planPoints]);
+
+  React.useEffect(() => {
+    surveyPointsRef.current = surveyPoints;
+  }, [surveyPoints]);
+
+  const saveNodePoints = async (nodeId, points) => {
+    if (!nodeId || !points || points.length === 0) return;
+    try {
+      const response = await fetch(`/api/surveys/${nodeId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(points.map(p => ({
+          md: p.md,
+          inclination: p.inclination,
+          azimuth: p.azimuth
+        })))
+      });
+      if (!response.ok) {
+        console.error("Auto-save failed for node", nodeId);
+      }
+    } catch (e) {
+      console.error("Auto-save error for node", nodeId, e);
+    }
+  };
+
+  // 3-minute idle auto-save and reset focus timer for side projects
+  useEffect(() => {
+    let idleTimeout = null;
+
+    const getRefCurrentSlot = () => {
+      const active = activeNodeRef.current;
+      const allNodes = nodesRef.current;
+      if (!active || allNodes.length === 0) return null;
+      const node = allNodes.find(n => n.id === active.id);
+      if (!node) return null;
+      if (node.type === 'slot') return node;
+      if (node.type === 'trajectory' || node.type === 'survey') {
+        return allNodes.find(n => n.id === node.parent_id) || null;
+      }
+      return null;
+    };
+
+    const isRefSideProjectActive = () => {
+      const active = activeNodeRef.current;
+      const allNodes = nodesRef.current;
+      if (!active || allNodes.length === 0) return false;
+      const slot = getRefCurrentSlot();
+      if (!slot) return false;
+      
+      let workingWell = allNodes.find(n => n.type === 'well' && (n.metadata?.is_working_project === true || n.metadata?.is_working_project === 'true'));
+      if (!workingWell) {
+        workingWell = allNodes.find(n => n.type === 'well');
+      }
+      if (!workingWell) return false;
+      
+      return slot.parent_id !== workingWell.id;
+    };
+
+    const triggerAutoSaveAndSwitch = async () => {
+      const active = activeNodeRef.current;
+      const allNodes = nodesRef.current;
+      if (!active || allNodes.length === 0) return;
+
+      const slot = getRefCurrentSlot();
+      if (!slot) return;
+
+      console.log("Idle timeout reached for side project. Autosaving...");
+
+      // Find children of this slot to identify plan/survey
+      const children = allNodes.filter(n => n.parent_id === slot.id);
+      const plans = children.filter(n => n.type === 'trajectory');
+      const surveys = children.filter(n => n.type === 'survey');
+
+      const isDef = (node) => {
+        if (!node) return false;
+        const meta = node.metadata;
+        return meta?.is_definitive === true || meta?.is_definitive === 'true';
+      };
+
+      // Auto-save plan table node
+      let planNodeToSave = null;
+      if (active.type === 'trajectory') {
+        planNodeToSave = active;
+      } else {
+        planNodeToSave = plans.find(p => isDef(p)) || plans[0] || null;
+      }
+
+      if (planNodeToSave && planPointsRef.current && planPointsRef.current.length > 0) {
+        await saveNodePoints(planNodeToSave.id, planPointsRef.current);
+      }
+
+      // Auto-save survey table node
+      let surveyNodeToSave = null;
+      if (active.type === 'survey') {
+        surveyNodeToSave = active;
+      } else {
+        surveyNodeToSave = surveys.find(s => isDef(s)) || surveys[0] || null;
+      }
+
+      if (surveyNodeToSave && surveyPointsRef.current && surveyPointsRef.current.length > 0) {
+        await saveNodePoints(surveyNodeToSave.id, surveyPointsRef.current);
+      }
+
+      // Set focus to the working project
+      let workingWell = allNodes.find(n => n.type === 'well' && (n.metadata?.is_working_project === true || n.metadata?.is_working_project === 'true'));
+      if (!workingWell) {
+        workingWell = allNodes.find(n => n.type === 'well');
+      }
+
+      if (workingWell) {
+        const workingSlots = allNodes.filter(n => n.parent_id === workingWell.id && n.type === 'slot');
+        if (workingSlots.length > 0) {
+          setActiveNode(workingSlots[0]);
+        } else {
+          setActiveNode(workingWell);
+        }
+      }
+
+      setRefreshTrigger(prev => prev + 1);
+    };
+
+    const handleActivity = () => {
+      if (idleTimeout) {
+        clearTimeout(idleTimeout);
+      }
+      if (isRefSideProjectActive()) {
+        idleTimeout = setTimeout(triggerAutoSaveAndSwitch, autoSaveMinutes * 60 * 1000);
+      }
+    };
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
+    events.forEach(event => {
+      window.addEventListener(event, handleActivity);
+    });
+
+    // Trigger check initially
+    handleActivity();
+
+    return () => {
+      if (idleTimeout) {
+        clearTimeout(idleTimeout);
+      }
+      events.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+    };
+  }, [activeNode, nodes, refreshTrigger, autoSaveMinutes]);
 
   // Load current user from localStorage on mount
   useEffect(() => {
@@ -62,8 +229,21 @@ export default function Home() {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        setAutoSaveMinutes(data.auto_save_interval || 3);
+      }
+    } catch (e) {
+      console.error("Failed to load settings", e);
+    }
+  };
+
   useEffect(() => {
     loadNodes();
+    fetchSettings();
   }, [refreshTrigger]);
 
   const getCurrentSlot = () => {
@@ -337,6 +517,11 @@ export default function Home() {
               {workingWell && (
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                   👷 Working Project: {workingWell.name}
+                </span>
+              )}
+              {currentSlot && !isActiveNodeUnderWorkingWell() && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 animate-pulse">
+                  ⏱️ Side Project: Auto-saves if idle for {autoSaveMinutes}m
                 </span>
               )}
               <span>

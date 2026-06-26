@@ -54,6 +54,19 @@ export function initDb() {
     );
   `);
 
+  // 4. Create Settings table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+
+  const settingCount = db.prepare("SELECT count(*) as count FROM settings WHERE key = 'auto_save_interval'").get().count;
+  if (settingCount === 0) {
+    db.prepare("INSERT INTO settings (key, value) VALUES ('auto_save_interval', '3')").run();
+  }
+
   console.log("Tables verified.");
 
   // Check if users table is empty, and seed if so

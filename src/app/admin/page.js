@@ -22,6 +22,11 @@ export default function AdminPage() {
   // Success/Error notifications
   const [userMsg, setUserMsg] = useState({ text: '', isError: false });
 
+  // Settings state variables
+  const [autoSaveInterval, setAutoSaveInterval] = useState(3);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState({ text: '', isError: false });
+
   // Load user and check role
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -56,6 +61,13 @@ export default function AdminPage() {
         if (nodesRes.ok) {
           const nData = await nodesRes.json();
           setNodes(nData);
+        }
+
+        // Fetch auto-save interval settings
+        const settingsRes = await fetch('/api/settings');
+        if (settingsRes.ok) {
+          const sData = await settingsRes.json();
+          setAutoSaveInterval(sData.auto_save_interval || 3);
         }
       } catch (e) {
         console.error("Failed to load admin data", e);
@@ -136,6 +148,31 @@ export default function AdminPage() {
       alert(`Node "${name}" deleted.`);
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsMsg({ text: '', isError: false });
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_save_interval: autoSaveInterval })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update configuration");
+      }
+
+      setSettingsMsg({ text: "System settings saved successfully!", isError: false });
+    } catch (err) {
+      setSettingsMsg({ text: err.message, isError: true });
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -345,49 +382,106 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Row 3: Node Hierarchy Data Registry Management */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
-            <Database className="h-4.5 w-4.5 text-emerald-500" />
-            Hierarchy Node Registry Management
-          </h2>
+        {/* Row 3: Node Hierarchy & System Settings */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          <div className="overflow-x-auto max-h-[300px]">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-550 font-bold bg-slate-50/50 dark:bg-slate-900/50">
-                  <th className="py-2 px-3">Node ID</th>
-                  <th className="py-2 px-3">Parent ID</th>
-                  <th className="py-2 px-3">Node Name</th>
-                  <th className="py-2 px-3">Entity Type</th>
-                  <th className="py-2 px-3 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {nodes.map(n => (
-                  <tr key={n.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
-                    <td className="py-2 px-3 text-slate-400 font-mono">{n.id}</td>
-                    <td className="py-2 px-3 text-slate-400 font-mono">{n.parent_id || 'Root (Null)'}</td>
-                    <td className="py-2 px-3 font-semibold">{n.name}</td>
-                    <td className="py-2 px-3">
-                      <span className="text-[10px] text-slate-500 capitalize px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
-                        {n.type}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-center">
-                      <button
-                        onClick={() => handleDeleteNode(n.id, n.name)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 p-1.5 rounded transition"
-                        title="Delete Node"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
+          {/* Node Registry */}
+          <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+              <Database className="h-4.5 w-4.5 text-emerald-500" />
+              Hierarchy Node Registry Management
+            </h2>
+            
+            <div className="overflow-x-auto max-h-[300px]">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-550 font-bold bg-slate-50/50 dark:bg-slate-900/50">
+                    <th className="py-2 px-3">Node ID</th>
+                    <th className="py-2 px-3">Parent ID</th>
+                    <th className="py-2 px-3">Node Name</th>
+                    <th className="py-2 px-3">Entity Type</th>
+                    <th className="py-2 px-3 text-center">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {nodes.map(n => (
+                    <tr key={n.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
+                      <td className="py-2 px-3 text-slate-400 font-mono">{n.id}</td>
+                      <td className="py-2 px-3 text-slate-400 font-mono">{n.parent_id || 'Root (Null)'}</td>
+                      <td className="py-2 px-3 font-semibold">{n.name}</td>
+                      <td className="py-2 px-3">
+                        <span className="text-[10px] text-slate-500 capitalize px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+                          {n.type}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <button
+                          onClick={() => handleDeleteNode(n.id, n.name)}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 p-1.5 rounded transition"
+                          title="Delete Node"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* System Configuration */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 flex flex-col">
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+              <ShieldAlert className="h-4.5 w-4.5 text-blue-500" />
+              System Configuration
+            </h2>
+            
+            {settingsMsg.text && (
+              <div className={`mb-3.5 p-2 rounded text-xs border ${
+                settingsMsg.isError 
+                  ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-950/50' 
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-950/50'
+              }`}>
+                {settingsMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSettings} className="space-y-4 flex-1 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">
+                    Side Project Auto-Save Interval
+                  </label>
+                  <select
+                    value={autoSaveInterval}
+                    onChange={(e) => setAutoSaveInterval(parseInt(e.target.value, 10))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs focus:border-blue-500 outline-none text-slate-800 dark:text-slate-100"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(m => (
+                      <option key={m} value={m}>{m} {m === 1 ? 'minute' : 'minutes'}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                    Set the inactivity period before modifications on side project wells are auto-saved to database and focus returns to the Working Project.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingSettings}
+                className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-medium py-2 rounded text-xs shadow transition mt-4 flex items-center justify-center gap-1.5"
+              >
+                {isSavingSettings ? 'Saving...' : (
+                  <>
+                    <Check className="h-4 w-4" /> Save Configuration
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
         </div>
 
       </main>

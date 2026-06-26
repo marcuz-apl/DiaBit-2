@@ -191,8 +191,10 @@ export default function ExcelGrid({
       closureDist: 0,
       closureAz: 0
     };
-    setPoints([tieInRow]);
+    const updated = [tieInRow];
+    setPoints(updated);
     setSelectedIndex(0);
+    onChange(updated);
   };
 
   // Export to CSV
