@@ -15,9 +15,6 @@ export default function LeftSidebar({
   const [nodes, setNodes] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState({});
   const [isOpen, setIsOpen] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(null); // Node ID being appended to
-  const [newNodeName, setNewNodeName] = useState('');
-  const [newNodeType, setNewNodeType] = useState('');
   const idleTimerRef = useRef(null);
 
   const [width, setWidth] = useState(256);
@@ -227,15 +224,15 @@ export default function LeftSidebar({
   };
 
   // CRUD API Calls
-  const handleAddNode = async (parentId, type) => {
-    if (!newNodeName.trim()) return;
+  const handleAddNode = async (parentId, type, name) => {
+    if (!name || !name.trim()) return;
     try {
       const res = await fetch('/api/nodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           parent_id: parentId,
-          name: newNodeName,
+          name: name.trim(),
           type: type,
           metadata: type === 'well' ? {
             units: 'metric',
@@ -260,8 +257,6 @@ export default function LeftSidebar({
             [`slot-${parentId}-${folderSuffix}`]: true
           }));
         }
-        setNewNodeName('');
-        setShowAddForm(null);
         fetchNodes();
         if (addedNode.type === 'trajectory' || addedNode.type === 'survey') {
           onSelectNode(addedNode);
@@ -308,9 +303,17 @@ export default function LeftSidebar({
   };
 
   const getFriendlyTypeName = (type) => {
-    if (type === 'trajectory') return 'Plan';
-    if (type === 'survey') return 'Actual Survey';
-    return type;
+    switch (type) {
+      case 'country': return 'Country';
+      case 'state': return 'State';
+      case 'basin': return 'Basin';
+      case 'field': return 'Field';
+      case 'well': return 'Well';
+      case 'slot': return 'Slot';
+      case 'trajectory': return 'Plan';
+      case 'survey': return 'Actual Survey';
+      default: return type;
+    }
   };
 
   const getChildTypeNeeded = (parentType) => {
@@ -382,9 +385,12 @@ export default function LeftSidebar({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowAddForm(showAddForm === node.id ? null : node.id);
-                  setNewNodeName('');
-                  setNewNodeType(childType);
+                  const friendlyType = getFriendlyTypeName(childType);
+                  const name = prompt(`Enter new ${friendlyType} name:`);
+                  if (name && name.trim()) {
+                    const dbParentId = (node.type === 'plans_folder' || node.type === 'surveys_folder') ? node.parent_id : node.id;
+                    handleAddNode(dbParentId, childType, name);
+                  }
                 }}
                 title={`Add ${getFriendlyTypeName(childType)}`}
                 className="p-0.5 rounded text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
@@ -403,31 +409,6 @@ export default function LeftSidebar({
             )}
           </div>
         </div>
-
-        {/* Inline sub-node creation form */}
-        {showAddForm === node.id && (
-          <div className="mt-1 pl-6 pr-2 py-1 bg-slate-50 dark:bg-slate-900 rounded-lg flex flex-col gap-1 border border-slate-200 dark:border-slate-800">
-            <div className="flex gap-1">
-              <input
-                type="text"
-                autoFocus
-                placeholder={`New ${getFriendlyTypeName(childType)} name...`}
-                value={newNodeName}
-                onChange={(e) => setNewNodeName(e.target.value)}
-                className="flex-1 text-xs py-0.5 px-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded outline-none text-slate-800 dark:text-slate-100"
-              />
-              <button
-                onClick={() => {
-                  const dbParentId = (node.type === 'plans_folder' || node.type === 'surveys_folder') ? node.parent_id : node.id;
-                  handleAddNode(dbParentId, childType);
-                }}
-                className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] hover:bg-blue-500 transition font-medium"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Render children recursively */}
         {isExpanded && node.children && (
@@ -476,34 +457,16 @@ export default function LeftSidebar({
           <span className="text-[10px] text-slate-400">Add top-level Country</span>
           <button
             onClick={() => {
-              setShowAddForm(showAddForm === 'root' ? null : 'root');
-              setNewNodeName('');
-              setNewNodeType('country');
+              const name = prompt("Enter new Country name:");
+              if (name && name.trim()) {
+                handleAddNode(null, 'country', name);
+              }
             }}
             className="p-1 rounded text-slate-500 hover:text-blue-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
-
-        {showAddForm === 'root' && (
-          <div className="m-2 p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 flex gap-1">
-            <input
-              type="text"
-              autoFocus
-              placeholder="Country name..."
-              value={newNodeName}
-              onChange={(e) => setNewNodeName(e.target.value)}
-              className="flex-1 text-xs py-0.5 px-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded outline-none text-slate-800 dark:text-slate-100"
-            />
-            <button
-              onClick={() => handleAddNode(null, 'country')}
-              className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] hover:bg-blue-500 transition font-medium"
-            >
-              Add
-            </button>
-          </div>
-        )}
 
         {/* Hierarchy Tree Area */}
         <div className="flex-1 overflow-y-auto px-1 py-3 space-y-1">
