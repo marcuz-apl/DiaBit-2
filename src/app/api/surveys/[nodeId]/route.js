@@ -88,7 +88,7 @@ export async function POST(request, { params }) {
       });
     }
 
-    const rawPoints = await request.json(); // Array of { md, inclination, azimuth }
+    const rawPoints = await request.json(); // Array of { station_name, md, inclination, azimuth }
     if (!Array.isArray(rawPoints)) {
       return new Response(JSON.stringify({ error: "Data must be an array of points" }), {
         status: 400,
@@ -147,16 +147,18 @@ export async function POST(request, { params }) {
 
       // Insert new calculated points
       const insertStmt = db.prepare(`
-        INSERT INTO survey_points (node_id, sequence_no, md, inclination, azimuth, tvd, north, east, dls, vs)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO survey_points (node_id, sequence_no, station_name, md, inclination, azimuth, tvd, north, east, dls, vs)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       calculatedPoints.forEach((pt, idx) => {
         const rawPt = rawPoints[idx] || {};
         const rawAz = parseFloat(rawPt.azimuth || rawPt.az || 0);
+        const stationName = rawPt.station_name !== undefined ? String(rawPt.station_name) : '';
         insertStmt.run(
           nodeId,
           idx,
+          stationName,
           pt.md,
           pt.inc,
           rawAz, // Raw azimuth stored in DB

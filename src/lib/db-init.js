@@ -43,6 +43,7 @@ export function initDb(db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       node_id INTEGER NOT NULL,
       sequence_no INTEGER NOT NULL,
+      station_name TEXT DEFAULT '',
       md REAL NOT NULL,
       inclination REAL NOT NULL,
       azimuth REAL NOT NULL,
@@ -54,6 +55,13 @@ export function initDb(db) {
       FOREIGN KEY (node_id) REFERENCES nodes (id) ON DELETE CASCADE
     );
   `);
+
+  // Migrate: add station_name column if it doesn't exist yet (for existing databases)
+  try {
+    db.exec(`ALTER TABLE survey_points ADD COLUMN station_name TEXT DEFAULT '';`);
+  } catch (_) {
+    // Column already exists, ignore
+  }
 
   // 4. Create Settings table
   db.exec(`
@@ -211,24 +219,24 @@ export function initDb(db) {
     ];
 
     const insertPoint = db.prepare(`
-      INSERT INTO survey_points (node_id, sequence_no, md, inclination, azimuth, tvd, north, east, dls, vs)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO survey_points (node_id, sequence_no, station_name, md, inclination, azimuth, tvd, north, east, dls, vs)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const pt of planPoints) {
-      insertPoint.run(planId, pt.seq, pt.md, pt.inc, pt.az, pt.tvd, pt.north, pt.east, pt.dls, pt.vs);
+      insertPoint.run(planId, pt.seq, pt.name || '', pt.md, pt.inc, pt.az, pt.tvd, pt.north, pt.east, pt.dls, pt.vs);
     }
 
     // Seed points for Midland Survey Actual
     const surveyPoints = [
-      { seq: 0, md: 0, inc: 0, az: 0, tvd: 0, north: 0, east: 0, dls: 0, vs: 0 },
-      { seq: 1, md: 500, inc: 0.2, az: 10, tvd: 500, north: 0.86, east: 0.15, dls: 0.012, vs: 0.72 },
-      { seq: 2, md: 1000, inc: 4.8, az: 42, tvd: 999.5, north: 16.2, east: 14.8, dls: 0.276, vs: 21.9 },
-      { seq: 3, md: 1500, inc: 9.6, az: 44, tvd: 1495.2, north: 61.4, east: 58.7, dls: 0.288, vs: 84.9 }
+      { seq: 0, name: 'TIE-IN', md: 0, inc: 0, az: 0, tvd: 0, north: 0, east: 0, dls: 0, vs: 0 },
+      { seq: 1, name: '',      md: 500, inc: 0.2, az: 10, tvd: 500, north: 0.86, east: 0.15, dls: 0.012, vs: 0.72 },
+      { seq: 2, name: 'KOP',   md: 1000, inc: 4.8, az: 42, tvd: 999.5, north: 16.2, east: 14.8, dls: 0.276, vs: 21.9 },
+      { seq: 3, name: '',      md: 1500, inc: 9.6, az: 44, tvd: 1495.2, north: 61.4, east: 58.7, dls: 0.288, vs: 84.9 }
     ];
 
     for (const pt of surveyPoints) {
-      insertPoint.run(surveyId, pt.seq, pt.md, pt.inc, pt.az, pt.tvd, pt.north, pt.east, pt.dls, pt.vs);
+      insertPoint.run(surveyId, pt.seq, pt.name || '', pt.md, pt.inc, pt.az, pt.tvd, pt.north, pt.east, pt.dls, pt.vs);
     }
 
     console.log("Default tree hierarchy seeded successfully.");

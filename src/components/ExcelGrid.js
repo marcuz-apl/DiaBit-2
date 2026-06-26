@@ -49,6 +49,7 @@ export default function ExcelGrid({
         
         return {
           ...p,
+          station_name: p.station_name !== undefined ? p.station_name : '',
           closureDist: typeof cDist === 'number' ? cDist : parseFloat(cDist) || 0,
           closureAz: typeof cAz === 'number' ? cAz : parseFloat(cAz) || 0
         };
@@ -57,6 +58,7 @@ export default function ExcelGrid({
     } else {
       // Default initial point (tie-in station)
       const defaultStart = {
+        station_name: 'TIE-IN',
         md: tieIn.md,
         inclination: tieIn.inc,
         azimuth: tieIn.az,
@@ -95,10 +97,11 @@ export default function ExcelGrid({
       unitSystem === 'imperial' ? 'imperial' : 'metric'
     );
 
-    // Map back into grid format, preserving raw azimuth in the table display
+    // Map back into grid format, preserving raw azimuth and station_name in the table display
     const mapped = calculated.map((c, idx) => {
       const rawPt = currentPoints[idx] || {};
       return {
+        station_name: rawPt.station_name !== undefined ? rawPt.station_name : '',
         md: c.md,
         inclination: c.inc,
         azimuth: rawPt.azimuth !== undefined ? rawPt.azimuth : c.az,
@@ -132,9 +135,10 @@ export default function ExcelGrid({
   };
 
   const handleAppendRow = () => {
-    const lastRow = points[points.length - 1] || { md: 0, inclination: 0, azimuth: 0 };
-    const newMD = lastRow.md + 100; // Increment default MD by 100
+    const lastRow = points[points.length - 1] || { station_name: '', md: 0, inclination: 0, azimuth: 0 };
+    const newMD = lastRow.md + 100;
     const newRow = {
+      station_name: '',
       md: newMD,
       inclination: lastRow.inclination,
       azimuth: lastRow.azimuth,
@@ -154,12 +158,13 @@ export default function ExcelGrid({
 
   const handleInsertRow = () => {
     const insertIdx = selectedIndex !== null ? selectedIndex : points.length;
-    const prevRow = points[insertIdx - 1] || { md: 0, inclination: 0, azimuth: 0 };
+    const prevRow = points[insertIdx - 1] || { station_name: '', md: 0, inclination: 0, azimuth: 0 };
     const nextRow = points[insertIdx] || { md: prevRow.md + 200, inclination: prevRow.inclination, azimuth: prevRow.azimuth };
     
     // Interpolate measured depth
     const newMD = Math.round((prevRow.md + nextRow.md) / 2);
     const newRow = {
+      station_name: '',
       md: newMD,
       inclination: prevRow.inclination,
       azimuth: prevRow.azimuth,
@@ -192,6 +197,7 @@ export default function ExcelGrid({
 
   const handleClearAll = () => {
     const tieInRow = points[0] || {
+      station_name: 'TIE-IN',
       md: tieIn.md,
       inclination: tieIn.inc,
       azimuth: tieIn.az,
@@ -214,8 +220,9 @@ export default function ExcelGrid({
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += "Station,Measured Depth,Inclination,Azimuth,TVD,Northing,Easting,DLS,Vertical Section\n";
     
-    points.forEach((p, idx) => {
-      csvContent += `${idx},${p.md},${p.inclination},${p.azimuth},${p.tvd},${p.north},${p.east},${p.dls},${p.vs}\n`;
+    points.forEach((p) => {
+      const stn = p.station_name !== undefined ? p.station_name : '';
+      csvContent += `${stn},${p.md},${p.inclination},${p.azimuth},${p.tvd},${p.north},${p.east},${p.dls},${p.vs}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -242,34 +249,40 @@ export default function ExcelGrid({
       const text = evt.target.result;
       const lines = text.split(/\r?\n/);
       const parsedPoints = [];
+      let headerSkipped = false;
 
       lines.forEach((line) => {
         if (!line.trim()) return;
         const cols = line.split(/[,\t;]/).map(c => c.trim());
-        
-        // Skip header lines (non-numeric for first columns)
-        const firstColVal = parseFloat(cols[0]);
-        const secondColVal = parseFloat(cols[1]);
-        const thirdColVal = parseFloat(cols[2]);
+        if (cols.length < 3) return;
 
-        // If the CSV structure is: MD, Inclination, Azimuth
-        if (!isNaN(firstColVal) && !isNaN(secondColVal) && !isNaN(thirdColVal)) {
-          // If 1st column is index, skip it and parse columns 1, 2, 3 as MD, Inc, Az
-          // If first column is Measured Depth directly, we use column 0, 1, 2.
-          if (cols.length >= 4 && !isNaN(parseFloat(cols[1]))) {
-            parsedPoints.push({
-              md: parseFloat(cols[1]),
-              inclination: parseFloat(cols[2]),
-              azimuth: parseFloat(cols[3])
-            });
-          } else {
-            parsedPoints.push({
-              md: firstColVal,
-              inclination: secondColVal,
-              azimuth: thirdColVal
-            });
-          }
+        // Detect and skip header row: if MD column (index 1 for 4-col, index 0 for 3-col) is not a number
+        // We check both possible layouts:
+        //   4-column: Station(text), MD, Inc, Az
+        //   3-column: MD, Inc, Az
+
+        const tryFourCol = cols.length >= 4;
+        const mdVal4 = parseFloat(cols[1]);
+        const mdVal3 = parseFloat(cols[0]);
+
+        if (tryFourCol && !isNaN(mdVal4)) {
+          // 4-column format: Station, MD, Inc, Az
+          parsedPoints.push({
+            station_name: cols[0],          // text label, preserved as-is
+            md: mdVal4,
+            inclination: parseFloat(cols[2]) || 0,
+            azimuth: parseFloat(cols[3]) || 0
+          });
+        } else if (!isNaN(mdVal3) && !isNaN(parseFloat(cols[1])) && !isNaN(parseFloat(cols[2]))) {
+          // 3-column format: MD, Inc, Az
+          parsedPoints.push({
+            station_name: '',
+            md: mdVal3,
+            inclination: parseFloat(cols[1]) || 0,
+            azimuth: parseFloat(cols[2]) || 0
+          });
         }
+        // else: likely a header row, skip silently
       });
 
       if (parsedPoints.length > 0) {
@@ -277,7 +290,7 @@ export default function ExcelGrid({
         const calculated = triggerRecalculate(parsedPoints);
         setPoints(calculated);
       } else {
-        alert("Could not parse CSV. Ensure it has columns: MD, Inclination, Azimuth (or Index, MD, Inc, Az).");
+        alert("Could not parse CSV. Expected columns: Station, MD, Inclination, Azimuth (or just MD, Inc, Az).");
       }
     };
     reader.readAsText(file);
@@ -295,6 +308,7 @@ export default function ExcelGrid({
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(points.map(p => ({
+          station_name: p.station_name !== undefined ? p.station_name : '',
           md: p.md,
           inclination: p.inclination,
           azimuth: p.azimuth
@@ -309,6 +323,7 @@ export default function ExcelGrid({
       const savedData = await response.json();
       // Update local grid with backend calculated and saved values
       const mapped = savedData.map(p => ({
+        station_name: p.station_name !== undefined ? p.station_name : '',
         md: p.md,
         inclination: p.inclination,
         azimuth: p.azimuth,
@@ -443,9 +458,15 @@ export default function ExcelGrid({
                     isSelected ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
                   }`}
                 >
-                  {/* Station index */}
-                  <td className="py-1.5 px-2 bg-slate-50 dark:bg-slate-900/80 font-medium text-slate-500 dark:text-slate-400">
-                    {idx}
+                  {/* Station name - editable text input */}
+                  <td className="p-0 bg-slate-50 dark:bg-slate-900/80">
+                    <input
+                      type="text"
+                      value={p.station_name || ''}
+                      placeholder={isTieIn ? 'TIE-IN' : idx.toString()}
+                      onChange={(e) => handleCellChange(idx, 'station_name', e.target.value)}
+                      className="w-full py-1.5 px-2 text-center bg-transparent border-none text-slate-600 dark:text-slate-400 font-medium placeholder-slate-300 dark:placeholder-slate-600 text-xs focus:outline-none focus:bg-blue-50/40 dark:focus:bg-blue-950/20"
+                    />
                   </td>
                   
                   {/* MD Input */}
