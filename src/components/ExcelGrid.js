@@ -4,6 +4,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { calculateSurvey } from '@/lib/mcm';
 import { Plus, Trash, ArrowDown, FileSpreadsheet, Download, Upload, Save, Play } from 'lucide-react';
 
+// Helper to format values safely in the spreadsheet
+function formatVal(val, decimals = 2) {
+  if (val === undefined || val === null) return '-';
+  const num = typeof val === 'number' ? val : parseFloat(val);
+  return isNaN(num) ? '-' : num.toFixed(decimals);
+}
+
 export default function ExcelGrid({
   nodeId,
   initialPoints = [],
@@ -21,7 +28,31 @@ export default function ExcelGrid({
   // Initialize and calculate when props change
   useEffect(() => {
     if (initialPoints && initialPoints.length > 0) {
-      setPoints(initialPoints);
+      // Map initial points to ensure they have closureDist and closureAz computed as numbers
+      const mapped = initialPoints.map(p => {
+        const east = typeof p.east === 'number' ? p.east : parseFloat(p.east) || 0;
+        const north = typeof p.north === 'number' ? p.north : parseFloat(p.north) || 0;
+        
+        let cDist = p.closureDist;
+        if (cDist === undefined || cDist === null) {
+          cDist = Math.sqrt(east * east + north * north);
+        }
+        
+        let cAz = p.closureAz;
+        if (cAz === undefined || cAz === null) {
+          cAz = (Math.atan2(east, north) * 180) / Math.PI;
+          if (cAz < 0) {
+            cAz += 360;
+          }
+        }
+        
+        return {
+          ...p,
+          closureDist: typeof cDist === 'number' ? cDist : parseFloat(cDist) || 0,
+          closureAz: typeof cAz === 'number' ? cAz : parseFloat(cAz) || 0
+        };
+      });
+      setPoints(mapped);
     } else {
       // Default initial point (tie-in station)
       const defaultStart = {
@@ -273,7 +304,7 @@ export default function ExcelGrid({
         dls: p.dls,
         vs: p.vs,
         closureDist: parseFloat(Math.sqrt(p.east * p.east + p.north * p.north).toFixed(4)),
-        closureAz: parseFloat(((180 * Math.atan2(p.east, p.north) / Math.PI) + 360) % 360).toFixed(4)
+        closureAz: parseFloat((((180 * Math.atan2(p.east, p.north) / Math.PI) + 360) % 360).toFixed(4))
       }));
       setPoints(mapped);
       onSaveSuccess(mapped);
@@ -446,25 +477,25 @@ export default function ExcelGrid({
 
                   {/* Calculated columns (grey background, non-editable) */}
                   <td className="py-1.5 px-3 text-right bg-slate-50/50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400">
-                    {p.tvd !== undefined ? p.tvd.toFixed(2) : '-'}
+                    {formatVal(p.tvd, 2)}
                   </td>
                   <td className="py-1.5 px-3 text-right bg-slate-50/50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400">
-                    {p.north !== undefined ? p.north.toFixed(2) : '-'}
+                    {formatVal(p.north, 2)}
                   </td>
                   <td className="py-1.5 px-3 text-right bg-slate-50/50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400">
-                    {p.east !== undefined ? p.east.toFixed(2) : '-'}
+                    {formatVal(p.east, 2)}
                   </td>
                   <td className="py-1.5 px-3 text-right bg-slate-50/50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400 font-medium">
-                    {p.dls !== undefined ? p.dls.toFixed(2) : '-'}
+                    {formatVal(p.dls, 2)}
                   </td>
                   <td className="py-1.5 px-3 text-right bg-slate-50/50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400">
-                    {p.vs !== undefined ? p.vs.toFixed(2) : '-'}
+                    {formatVal(p.vs, 2)}
                   </td>
                   <td className="py-1.5 px-3 text-right bg-slate-50/80 dark:bg-slate-900/10 text-slate-500 dark:text-slate-500">
-                    {p.closureDist !== undefined ? p.closureDist.toFixed(2) : '-'}
+                    {formatVal(p.closureDist, 2)}
                   </td>
                   <td className="py-1.5 px-3 text-right bg-slate-50/80 dark:bg-slate-900/10 text-slate-500 dark:text-slate-500">
-                    {p.closureAz !== undefined ? p.closureAz.toFixed(1) : '-'}
+                    {formatVal(p.closureAz, 1)}
                   </td>
                 </tr>
               );

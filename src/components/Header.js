@@ -84,14 +84,6 @@ export default function Header({ currentUser, onLogin, onLogout }) {
               <Info className="h-4 w-4" />
               About
             </Link>
-            {currentUser?.role === 'admin' && (
-              <Link 
-                href="/admin"
-                className="text-xs font-semibold text-amber-500 hover:text-amber-400 transition px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10"
-              >
-                Admin Panel
-              </Link>
-            )}
           </div>
 
           {/* Center: Logo and App Name */}
@@ -111,18 +103,17 @@ export default function Header({ currentUser, onLogin, onLogout }) {
 
           {/* Right corner: User profile & Theme Toggle */}
           <div className="flex items-center gap-4">
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            >
-              {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
-            </button>
-
             {/* User Profile */}
             {currentUser ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {currentUser?.role === 'admin' && (
+                  <Link 
+                    href="/admin"
+                    className="text-xs font-semibold text-amber-500 hover:text-amber-400 transition px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10"
+                  >
+                    Admin Panel
+                  </Link>
+                )}
                 <div className="flex flex-col text-right">
                   <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{currentUser.username}</span>
                   <span className="text-[9px] text-slate-400 capitalize">{currentUser.role}</span>
@@ -144,6 +135,15 @@ export default function Header({ currentUser, onLogin, onLogout }) {
                 Sign In
               </button>
             )}
+
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+            </button>
           </div>
         </div>
       </header>
