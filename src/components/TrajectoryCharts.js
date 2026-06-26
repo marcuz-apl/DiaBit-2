@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
 // Dynamically import Plotly with server-side rendering disabled
@@ -18,10 +18,27 @@ const Plot = dynamic(() => import('react-plotly.js'), {
 
 export default function TrajectoryCharts({ planPoints = [], actualPoints = [], isDark = true, unitSystem = 'metric' }) {
   const [mounted, setMounted] = useState(false);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Trigger a window resize event so Plotly knows to recalculate sizes
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    resizeObserver.observe(container);
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [mounted]);
 
   if (!mounted) return null;
 
@@ -64,7 +81,7 @@ export default function TrajectoryCharts({ planPoints = [], actualPoints = [], i
   const layout3D = {
     title: { text: `3D Trajectory (${len})`, font: { color: textColor, size: 14 } },
     autosize: true,
-    height: 380,
+    height: 760,
     margin: { l: 0, r: 0, b: 0, t: 30 },
     paper_bgcolor: bgColor,
     scene: {
@@ -198,7 +215,7 @@ export default function TrajectoryCharts({ planPoints = [], actualPoints = [], i
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div ref={containerRef} className="flex flex-col gap-4 w-full">
       {/* 3D Plot (Full Width, sits above) */}
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:backdrop-blur-md w-full">
         <Plot
