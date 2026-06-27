@@ -1,65 +1,48 @@
 import db from '@/lib/database';
 
-// ─── WGS84 constants ────────────────────────────────────────────────────────
-const WGS84_A  = 6378137.0;          // semi-major axis (m)
-const WGS84_F  = 1 / 298.257223563;  // flattening
-const WGS84_E2 = 2 * WGS84_F - WGS84_F * WGS84_F; // first eccentricity squared
-const WGS84_K0 = 0.9996;             // UTM scale factor
+import proj4 from 'proj4';
 
-// ─── UTM → Lat/Lon (Karney series, truncated to sub-cm accuracy) ─────────────
-function utmToLatLon(easting, northing, zone, hemisphere) {
-  const E0 = 500000;
-  const N0 = hemisphere === 'S' ? 10000000 : 0;
-  const lambda0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180; // central meridian (rad)
+// ─── Universal Proj4 Coordinate Engine ──────────────────────────────────────
+const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
 
-  const n = WGS84_F / (2 - WGS84_F);
-  const A = WGS84_A / (1 + n) * (1 + n*n/4 + n*n*n*n/64);
+function proj4ToLatLon(easting, northing, proj4Def) {
+  // 1. Transform coordinates
+  const p1 = proj4(proj4Def, WGS84_PROJ4, [easting, northing]);
+  
+  // 2. Compute Convergence and Scale Factor via finite differences
+  // Move 1000m strictly Grid North
+  const p2 = proj4(proj4Def, WGS84_PROJ4, [easting, northing + 1000]);
+  
+  const dLon = p2[0] - p1[0]; // degrees
+  const dLat = p2[1] - p1[1]; // degrees
+  
+  // Convert spherical differences to approximate metric distance on WGS84
+  // using localized radii for high accuracy over short distance (1km)
+  const phi = p1[1] * Math.PI / 180;
+  // WGS84 semi-major axis (a) and semi-minor axis (b)
+  const a = 6378137.0;
+  const e2 = 0.00669437999014;
+  
+  const W = Math.sqrt(1 - e2 * Math.sin(phi) * Math.sin(phi));
+  const M = a * (1 - e2) / (W * W * W); // Radius of curvature in meridian
+  const N = a / W;                      // Radius of curvature in prime vertical
+  
+  const dy = dLat * Math.PI / 180 * M;
+  const dx = dLon * Math.PI / 180 * N * Math.cos(phi);
+  
+  // Convergence is angle from True North (dy) to Grid North
+  const convergence = Math.atan2(dx, dy) * 180 / Math.PI;
+  
+  // Point scale factor: Grid Distance (1000m) / Ellipsoid Distance
+  const ellipsoidDist = Math.sqrt(dx*dx + dy*dy);
+  const scaleFactor = 1000 / ellipsoidDist;
 
-  const xi = (northing - N0) / (WGS84_K0 * A);
-  const eta = (easting - E0) / (WGS84_K0 * A);
-
-  // Series coefficients β_j (Karney 2011)
-  const beta = [
-    0,
-    n/2 - 2*n*n/3 + 37*n*n*n/96,
-    n*n/48 + n*n*n/15,
-    17*n*n*n/480,
-    0
-  ];
-
-  let xi1 = xi;
-  let eta1 = eta;
-  for (let j = 1; j <= 3; j++) {
-    xi1  -= beta[j] * Math.sin(2*j*xi) * Math.cosh(2*j*eta);
-    eta1 -= beta[j] * Math.cos(2*j*xi) * Math.sinh(2*j*eta);
-  }
-
-  const chi = Math.asin(Math.sin(xi1) / Math.cosh(eta1));
-  const lambda = lambda0 + Math.atan2(Math.sinh(eta1), Math.cos(xi1));
-
-  // Conformal latitude → geodetic latitude (Bowring iteration)
-  const e = Math.sqrt(WGS84_E2);
-  let phi = chi;
-  for (let i = 0; i < 5; i++) {
-    const sp = Math.sin(phi);
-    phi = 2 * Math.atan(Math.tan(Math.PI / 4 + chi / 2) *
-      Math.pow((1 + e * sp) / (1 - e * sp), e / 2)) - Math.PI / 2;
-  }
-
-  const latDeg = phi * 180 / Math.PI;
-  const lonDeg = lambda * 180 / Math.PI;
-
-  // Grid convergence (γ) in degrees — simplified formula sufficient for O&G
-  const deltaLambda = lonDeg - (zone - 1) * 6 - 180 + 3; // lon offset from CM (deg)
-  const convergence = Math.atan(Math.tan(deltaLambda * Math.PI / 180) * Math.sin(phi)) * 180 / Math.PI;
-
-  // Point scale factor k
-  const t = Math.tan(phi);
-  const eta2 = WGS84_E2 * Math.cos(phi) * Math.cos(phi) / (1 - WGS84_E2);
-  const dL = (easting - E0) / (WGS84_K0 * WGS84_A);
-  const scaleFactor = WGS84_K0 * Math.sqrt(1 + eta2) * Math.sqrt(1 + t*t * dL*dL / (1 + eta2));
-
-  return { lat: latDeg, lon: lonDeg, convergence, scaleFactor };
+  return {
+    lat: p1[1],
+    lon: p1[0],
+    convergence,
+    scaleFactor
+  };
 }
 
 // ─── Gravity (WGS84 Somigliana + free-air correction) ───────────────────────
@@ -173,20 +156,26 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // 'utm', 'gravity', or 'magnetic'
 
-    // ── UTM → Lat/Lon conversion ─────────────────────────────────────────────
+    // ── Proj4 CRS → Lat/Lon conversion ───────────────────────────────────────
     if (type === 'utm') {
       const easting  = parseFloat(searchParams.get('easting'));
       const northing = parseFloat(searchParams.get('northing'));
-      const zone     = parseInt(searchParams.get('zone'), 10);
-      const hemisphere = searchParams.get('hemisphere') || 'N';
+      const epsgCode = searchParams.get('epsg'); // Pass epsg instead of zone/hemisphere
 
-      if (isNaN(easting) || isNaN(northing) || isNaN(zone)) {
-        return new Response(JSON.stringify({ error: 'easting, northing, and zone are required' }), {
+      if (isNaN(easting) || isNaN(northing) || !epsgCode) {
+        return new Response(JSON.stringify({ error: 'easting, northing, and epsg code are required' }), {
           status: 400, headers: { 'Content-Type': 'application/json' }
         });
       }
 
-      const result = utmToLatLon(easting, northing, zone, hemisphere);
+      const crs = db.prepare("SELECT proj4 FROM crs_registry WHERE epsg_code = ?").get(parseInt(epsgCode, 10));
+      if (!crs || !crs.proj4) {
+        return new Response(JSON.stringify({ error: 'CRS not found in registry' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      const result = proj4ToLatLon(easting, northing, crs.proj4);
       return new Response(JSON.stringify(result), {
         status: 200, headers: { 'Content-Type': 'application/json' }
       });

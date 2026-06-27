@@ -92,7 +92,7 @@ export default function RightSidebar({
 
   // Auto UTM → Lat/Lon when easting, northing, or CRS selection changes
   useEffect(() => {
-    if (!selectedCrsObj || selectedCrsObj.projection !== 'utm') return;
+    if (!selectedCrsObj || !selectedCrsObj.epsg_code) return;
     const e = parseFloat(easting);
     const n = parseFloat(northing);
     if (isNaN(e) || isNaN(n)) return;
@@ -101,7 +101,7 @@ export default function RightSidebar({
     const convert = async () => {
       try {
         setIsFetchingGeo(true);
-        const url = `/api/geo?type=utm&easting=${e}&northing=${n}&zone=${selectedCrsObj.zone}&hemisphere=${selectedCrsObj.hemisphere || 'N'}`;
+        const url = `/api/geo?type=utm&easting=${e}&northing=${n}&epsg=${selectedCrsObj.epsg_code}`;
         const res = await fetch(url);
         if (!res.ok || cancelled) return;
         const data = await res.json();

@@ -115,3 +115,20 @@ To bypass Server-Side Rendering (SSR) limits in Next.js, the `TrajectoryCharts` 
 - **Plan View**: $X$ vs $Y$ with a locked 1:1 aspect ratio to ensure no path distortion.
 - **Vertical Section View**: Horizontal displacement along VS vs TVD (inverted).
 - **Overlay Plots**: Sibling node data is fetched dynamically. If a user loads a Survey path, it retrieves its twin Trajectory Plan to plot both side-by-side for plan-vs-actual comparison.
+
+## 4. Universal Coordinate System Engine (Proj4 & EPSG)
+
+To support arbitrary local projections (e.g., ED50 UTM34N) beyond standard WGS84 datums, the application employs a universal projection engine architecture:
+
+### 1. Full EPSG Catalog Integration
+Instead of hardcoding standard UTM zones, the system utilizes the `epsg-index` NPM package. This provides a machine-readable JSON registry of over 8,000 Coordinate Reference Systems globally. These records are seeded into the local SQLite `crs_registry` table, allowing offline, zero-latency autocomplete searches across thousands of international standards.
+
+### 2. Proj4 Mathematical Projections
+For spatial coordinate transformation (e.g., Easting/Northing → Lat/Lon), the backend relies on the `proj4` engine rather than closed-form WGS84 equations (like Karney's series). 
+- When an API request (`/api/geo?type=utm`) is triggered, the system retrieves the `proj4` string definition from the `crs_registry` (e.g., `+proj=utm +zone=34 +ellps=intl...`).
+- It passes the input Cartesian coordinates through `proj4` against a WGS84 baseline to compute the exact Latitude and Longitude.
+
+### 3. Grid Convergence and Point Scale Factor
+Because `proj4` outputs spatial coordinates but does not natively expose mapping factors (Convergence and Scale Factor) to the Javascript wrapper, these are computed dynamically via finite differences:
+- A secondary point $1000m$ purely Grid North from the target is projected.
+- The differences in Geodetic coordinates ($d\lambda, d\phi$) are used to compute the angle from True North to Grid North (Convergence $\gamma$) and the proportional distortion (Scale Factor $k$).

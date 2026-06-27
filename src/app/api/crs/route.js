@@ -13,14 +13,13 @@ export async function GET(request) {
     if (q.trim()) {
       rows = db.prepare(`
         SELECT * FROM crs_registry
-        WHERE active = 1
-          AND (name LIKE ? OR CAST(epsg_code AS TEXT) LIKE ? OR projection LIKE ?)
-        ORDER BY epsg_code ASC
-        LIMIT 60
+        WHERE name LIKE ? OR CAST(epsg_code AS TEXT) LIKE ? OR area LIKE ?
+        ORDER BY active DESC, epsg_code ASC
+        LIMIT 100
       `).all(`%${q}%`, `%${q}%`, `%${q}%`);
     } else {
       rows = db.prepare(`
-        SELECT * FROM crs_registry WHERE active = 1 ORDER BY epsg_code ASC
+        SELECT * FROM crs_registry WHERE active = 1 ORDER BY epsg_code ASC LIMIT 100
       `).all();
     }
 
@@ -39,19 +38,17 @@ export async function GET(request) {
 /**
  * POST /api/crs
  * Admin: Add a custom CRS entry
- * Body: { epsg_code, name, projection, zone, hemisphere, datum, central_meridian, false_easting, false_northing, scale_factor }
+ * Body: { epsg_code, name, proj4, area, accuracy }
  */
 export async function POST(request) {
   try {
     const body = await request.json();
     const {
-      epsg_code, name, projection, zone, hemisphere,
-      datum = 'WGS84', central_meridian, false_easting = 500000,
-      false_northing = 0, scale_factor = 0.9996
+      epsg_code, name, proj4, area = '', accuracy = null
     } = body;
 
-    if (!name || !projection) {
-      return new Response(JSON.stringify({ error: 'name and projection are required' }), {
+    if (!name || !proj4) {
+      return new Response(JSON.stringify({ error: 'name and proj4 string are required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -59,14 +56,12 @@ export async function POST(request) {
 
     const stmt = db.prepare(`
       INSERT INTO crs_registry
-        (epsg_code, name, projection, zone, hemisphere, datum, central_meridian, false_easting, false_northing, scale_factor, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        (epsg_code, name, proj4, area, accuracy, active)
+      VALUES (?, ?, ?, ?, ?, 1)
     `);
 
     const result = stmt.run(
-      epsg_code || null, name, projection,
-      zone || null, hemisphere || null, datum,
-      central_meridian || null, false_easting, false_northing, scale_factor
+      epsg_code || null, name, proj4, area, accuracy
     );
 
     const created = db.prepare('SELECT * FROM crs_registry WHERE id = ?').get(result.lastInsertRowid);

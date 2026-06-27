@@ -64,46 +64,63 @@ export function initDb(db) {
   }
 
   // 4b. CRS Registry table
+  // Check if crs_registry needs an upgrade to support proj4
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(crs_registry)").all();
+    if (tableInfo.length > 0 && !tableInfo.some(col => col.name === 'proj4')) {
+      console.log("Upgrading crs_registry to universal proj4 schema...");
+      db.exec("DROP TABLE crs_registry;");
+    }
+  } catch (e) {}
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS crs_registry (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       epsg_code        INTEGER UNIQUE,
       name             TEXT NOT NULL,
-      projection       TEXT NOT NULL,
-      zone             INTEGER,
-      hemisphere       TEXT,
-      datum            TEXT DEFAULT 'WGS84',
-      central_meridian REAL,
-      false_easting    REAL DEFAULT 500000,
-      false_northing   REAL DEFAULT 0,
-      scale_factor     REAL DEFAULT 0.9996,
-      active           INTEGER DEFAULT 1
+      proj4            TEXT NOT NULL,
+      area             TEXT,
+      accuracy         REAL,
+      active           INTEGER DEFAULT 0
     );
   `);
 
   const crsCount = db.prepare("SELECT count(*) as count FROM crs_registry").get().count;
   if (crsCount === 0) {
     try {
-      const crsPath = path.join(process.cwd(), 'data', 'g-m-fields', 'crs_registry.json');
-      if (fs.existsSync(crsPath)) {
-        const crsList = JSON.parse(fs.readFileSync(crsPath, 'utf8'));
-        const insertCrs = db.prepare(`
-          INSERT OR IGNORE INTO crs_registry
-            (epsg_code, name, projection, zone, hemisphere, datum, central_meridian, false_easting, false_northing, scale_factor, active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        `);
-        const insertManyCrs = db.transaction((rows) => {
-          for (const c of rows) {
-            insertCrs.run(c.epsg_code || null, c.name, c.projection, c.zone || null, c.hemisphere || null,
-              c.datum || 'WGS84', c.central_meridian || null, c.false_easting ?? 500000,
-              c.false_northing ?? 0, c.scale_factor ?? 0.9996);
-          }
-        });
-        insertManyCrs(crsList);
-        console.log(`CRS registry seeded: ${crsList.length} entries.`);
-      }
+      console.log("Seeding universal EPSG index (this may take a few seconds)...");
+      const epsgAll = require('epsg-index/all.json');
+      const insertCrs = db.prepare(`
+        INSERT OR IGNORE INTO crs_registry
+          (epsg_code, name, proj4, area, accuracy, active)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      
+      const insertManyCrs = db.transaction((epsgDict) => {
+        for (const code of Object.keys(epsgDict)) {
+          const c = epsgDict[code];
+          if (!c.proj4 || !c.proj4.includes('+proj=')) continue;
+          
+          // Make WGS84 and basic UTMs active by default so they show up easily
+          let active = 0;
+          if (c.code === '4326' || c.code === '3857') active = 1;
+          if (c.name.includes('UTM zone') && c.name.includes('WGS 84')) active = 1;
+          
+          insertCrs.run(
+            parseInt(c.code, 10), 
+            c.name, 
+            c.proj4, 
+            c.area || null, 
+            c.accuracy || null,
+            active
+          );
+        }
+      });
+      
+      insertManyCrs(epsgAll);
+      console.log(`EPSG registry seeded successfully.`);
     } catch (err) {
-      console.error("Failed to seed CRS registry", err);
+      console.error("Failed to seed EPSG registry", err);
     }
   }
 
