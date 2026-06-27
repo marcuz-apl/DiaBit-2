@@ -6,40 +6,49 @@ import proj4 from 'proj4';
 const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
 
 function proj4ToLatLon(easting, northing, proj4Def) {
-  // 1. Transform coordinates
-  const p1 = proj4(proj4Def, WGS84_PROJ4, [easting, northing]);
+  // 1. Transform to WGS84 (for Magnetic API and background calculations)
+  const p1_wgs84 = proj4(proj4Def, WGS84_PROJ4, [easting, northing]);
   
-  // 2. Compute Convergence and Scale Factor via finite differences
-  // Move 1000m strictly Grid North
-  const p2 = proj4(proj4Def, WGS84_PROJ4, [easting, northing + 1000]);
+  // 2. Transform to Native Geographic (without WGS84 shift) for UI display and Convergence
+  const nativeProj4 = proj4Def.replace(/\+towgs84=[^\s]+/, '');
+  const ellpsMatch = nativeProj4.match(/\+ellps=[^\s]+/);
+  const nativeGeoDef = "+proj=longlat " + (ellpsMatch ? ellpsMatch[0] : "+datum=WGS84") + " +no_defs";
   
-  const dLon = p2[0] - p1[0]; // degrees
-  const dLat = p2[1] - p1[1]; // degrees
+  const p1_native = proj4(nativeProj4, nativeGeoDef, [easting, northing]);
   
-  // Convert spherical differences to approximate metric distance on WGS84
-  // using localized radii for high accuracy over short distance (1km)
-  const phi = p1[1] * Math.PI / 180;
-  // WGS84 semi-major axis (a) and semi-minor axis (b)
-  const a = 6378137.0;
-  const e2 = 0.00669437999014;
+  // 3. Compute Convergence and Scale Factor
+  let convergence = 0;
+  let scaleFactor = 1.0;
   
-  const W = Math.sqrt(1 - e2 * Math.sin(phi) * Math.sin(phi));
-  const M = a * (1 - e2) / (W * W * W); // Radius of curvature in meridian
-  const N = a / W;                      // Radius of curvature in prime vertical
-  
-  const dy = dLat * Math.PI / 180 * M;
-  const dx = dLon * Math.PI / 180 * N * Math.cos(phi);
-  
-  // Convergence is angle from True North (dy) to Grid North
-  const convergence = Math.atan2(dx, dy) * 180 / Math.PI;
-  
-  // Point scale factor: Grid Distance (1000m) / Ellipsoid Distance
-  const ellipsoidDist = Math.sqrt(dx*dx + dy*dy);
-  const scaleFactor = 1000 / ellipsoidDist;
+  try {
+    const proj = proj4.Proj(nativeProj4);
+    if (proj && (proj.projName === 'tmerc' || proj.projName === 'utm')) { // UTM is a Transverse Mercator
+      const latRad = p1_native[1] * Math.PI / 180;
+      const lonRad = p1_native[0] * Math.PI / 180;
+      
+      // Convergence: γ = arctan(tan(λ - λ0) * sin(φ))
+      const lon0 = proj.long0; // central meridian in radians
+      convergence = Math.atan(Math.tan(lonRad - lon0) * Math.sin(latRad)) * 180 / Math.PI;
+      
+      // Scale Factor: k = k0 * [1 + (x^2 / 2ν^2)]
+      const a = proj.a;
+      const e2 = proj.es;
+      const k0 = proj.k0;
+      const x0 = proj.x0;
+      
+      const nu = a / Math.sqrt(1 - e2 * Math.sin(latRad) * Math.sin(latRad));
+      const x = easting - x0;
+      scaleFactor = k0 * (1 + (x * x) / (2 * nu * nu));
+    }
+  } catch (err) {
+    console.error("Scale factor computation error:", err);
+  }
 
   return {
-    lat: p1[1],
-    lon: p1[0],
+    lat: p1_native[1],          // UI Display (Native Lat)
+    lon: p1_native[0],          // UI Display (Native Lon)
+    lat_wgs84: p1_wgs84[1],     // Background Magnetic Engine Lat
+    lon_wgs84: p1_wgs84[0],     // Background Magnetic Engine Lon
     convergence,
     scaleFactor
   };
@@ -175,7 +184,17 @@ export async function GET(request) {
         });
       }
 
-      const result = proj4ToLatLon(easting, northing, crs.proj4);
+      let proj4Def = crs.proj4;
+      const towgs84Override = searchParams.get('towgs84');
+      if (towgs84Override) {
+        if (proj4Def.includes('+towgs84=')) {
+          proj4Def = proj4Def.replace(/\+towgs84=[^\s]+/, `+towgs84=${towgs84Override}`);
+        } else {
+          proj4Def = proj4Def.replace('+no_defs', `+towgs84=${towgs84Override} +no_defs`);
+        }
+      }
+
+      const result = proj4ToLatLon(easting, northing, proj4Def);
       return new Response(JSON.stringify(result), {
         status: 200, headers: { 'Content-Type': 'application/json' }
       });

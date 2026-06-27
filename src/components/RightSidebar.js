@@ -15,6 +15,8 @@ export default function RightSidebar({
   const [elevation, setElevation] = useState(0);
   const [latitude, setLatitude] = useState(0);
   const [longitude, setLongitude] = useState(0);
+  const [latWgs84, setLatWgs84] = useState(0);
+  const [lonWgs84, setLonWgs84] = useState(0);
   const [easting, setEasting] = useState(0);
   const [northing, setNorthing] = useState(0);
 
@@ -35,6 +37,12 @@ export default function RightSidebar({
   const [magneticModel, setMagneticModel] = useState('HDGM 2025');
   const [northReference, setNorthReference] = useState('grid');
   const [gridConvergenceUsed, setGridConvergenceUsed] = useState(true);
+
+  // Datum Override states
+  const [datumOverride, setDatumOverride] = useState(false);
+  const [towgs84Dx, setTowgs84Dx] = useState(0);
+  const [towgs84Dy, setTowgs84Dy] = useState(0);
+  const [towgs84Dz, setTowgs84Dz] = useState(0);
 
   // States for reference models from API
   const [gravityModels, setGravityModels] = useState([]);
@@ -106,6 +114,41 @@ export default function RightSidebar({
     }
   }, [crs, crsOptions]);
 
+  const hasLoadedInitialCrs = useRef(false);
+
+  // Auto-apply localized Datum Shift when a new CRS is selected
+  useEffect(() => {
+    if (!selectedCrsObj || !selectedCrsObj.epsg_code) return;
+    
+    // Prevent overwriting user's saved values on initial node load
+    if (!hasLoadedInitialCrs.current) {
+      hasLoadedInitialCrs.current = true;
+      return;
+    }
+
+    let cancelled = false;
+    const fetchDatumShift = async () => {
+      try {
+        const res = await fetch(`/api/datum-shifts?epsg=${selectedCrsObj.epsg_code}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        
+        if (data.found) {
+          setDatumOverride(true);
+          setTowgs84Dx(data.dx);
+          setTowgs84Dy(data.dy);
+          setTowgs84Dz(data.dz);
+          setSaveMessage(`Applied local shift for ${data.region_name}`);
+          setSaveError(false);
+          setTimeout(() => setSaveMessage(null), 3000);
+        }
+      } catch (err) {}
+    };
+    fetchDatumShift();
+    
+    return () => { cancelled = true; };
+  }, [selectedCrsObj]);
+
   // Auto UTM → Lat/Lon when easting, northing, or CRS selection changes
   useEffect(() => {
     if (!selectedCrsObj || !selectedCrsObj.epsg_code) return;
@@ -117,13 +160,16 @@ export default function RightSidebar({
     const convert = async () => {
       try {
         setIsFetchingGeo(true);
-        const url = `/api/geo?type=utm&easting=${e}&northing=${n}&epsg=${selectedCrsObj.epsg_code}`;
+        const towgsParam = datumOverride ? `&towgs84=${towgs84Dx},${towgs84Dy},${towgs84Dz},0,0,0,0` : '';
+        const url = `/api/geo?type=utm&easting=${e}&northing=${n}&epsg=${selectedCrsObj.epsg_code}${towgsParam}`;
         const res = await fetch(url);
         if (!res.ok || cancelled) return;
         const data = await res.json();
         if (data.lat !== undefined) {
           setLatitude(parseFloat(data.lat.toFixed(6)));
           setLongitude(parseFloat(data.lon.toFixed(6)));
+          setLatWgs84(parseFloat(data.lat_wgs84.toFixed(6)));
+          setLonWgs84(parseFloat(data.lon_wgs84.toFixed(6)));
           setLatDisplay(decimalToDms(data.lat, true));
           setLonDisplay(decimalToDms(data.lon, false));
           setGridConvergence(parseFloat(data.convergence.toFixed(4)));
@@ -135,7 +181,7 @@ export default function RightSidebar({
 
     const timer = setTimeout(convert, 600); // debounce 600ms
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [easting, northing, selectedCrsObj]);
+  }, [easting, northing, selectedCrsObj, datumOverride, towgs84Dx, towgs84Dy, towgs84Dz]);
 
   // Tie-in settings (specific to trajectory metadata or defaults)
   const [tieInMd, setTieInMd] = useState(0);
@@ -147,8 +193,10 @@ export default function RightSidebar({
 
   const [isSaving, setIsSaving] = useState(false);
   
-  // Collapse/Autohide state
+  // Sidebar resizing state
   const [isOpen, setIsOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const isResizing = useRef(false);
   const idleTimerRef = useRef(null);
 
   // Autohide idle logic: 30 seconds of inactivity collapses the sidebar
@@ -180,6 +228,34 @@ export default function RightSidebar({
       window.removeEventListener('mousemove', handleUserActivity);
       window.removeEventListener('mousedown', handleUserActivity);
       window.removeEventListener('keydown', handleUserActivity);
+    };
+  }, []);
+
+  // Resize handler
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing.current) return;
+      // Calculate width from the right edge of the screen
+      const newWidth = window.innerWidth - e.clientX;
+      // Constrain width
+      if (newWidth > 250 && newWidth < 800) {
+        setSidebarWidth(newWidth);
+      }
+    };
+    
+    const handleMouseUp = () => {
+      if (isResizing.current) {
+        isResizing.current = false;
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto'; // Re-enable text selection
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
 
@@ -218,6 +294,8 @@ export default function RightSidebar({
       setElevation(meta.elevation || 0);
       setLatitude(meta.latitude || 0);
       setLongitude(meta.longitude || 0);
+      setLatWgs84(meta.lat_wgs84 || meta.latitude || 0);
+      setLonWgs84(meta.lon_wgs84 || meta.longitude || 0);
       setLatDisplay(decimalToDms(meta.latitude || 0, true));
       setLonDisplay(decimalToDms(meta.longitude || 0, false));
       setEasting(meta.easting || 0);
@@ -243,6 +321,10 @@ export default function RightSidebar({
           ? (meta.grid_convergence_used === true || meta.grid_convergence_used === 'true' || meta.grid_convergence_used === 'yes')
           : true
       );
+      setDatumOverride(meta.datum_override === true || meta.datum_override === 'true');
+      setTowgs84Dx(meta.towgs84_dx || 0);
+      setTowgs84Dy(meta.towgs84_dy || 0);
+      setTowgs84Dz(meta.towgs84_dz || 0);
 
       // Trajectory specific tie-in settings (only applicable to trajectory or survey)
       if (active.type === 'trajectory' || active.type === 'survey') {
@@ -269,13 +351,15 @@ export default function RightSidebar({
   }, [activeNode, nodes]);
 
   const handleAutofillMagnetic = async () => {
-    if (!latitude || !longitude) {
+    const lat = latWgs84 || latitude;
+    const lon = lonWgs84 || longitude;
+    if (!lat || !lon) {
       alert("Please ensure Latitude and Longitude are computed first.");
       return;
     }
     try {
       setIsSaving(true);
-      const url = `/api/geo?type=magnetic&lat=${latitude}&lon=${longitude}&alt=${elevation || 0}`;
+      const url = `/api/geo?type=magnetic&lat=${lat}&lon=${lon}&alt=${elevation || 0}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -299,13 +383,14 @@ export default function RightSidebar({
   };
 
   const handleAutofillGravity = async () => {
-    if (!latitude) {
+    const lat = latWgs84 || latitude;
+    if (!lat) {
       alert("Please ensure Latitude is computed first.");
       return;
     }
     try {
       setIsSaving(true);
-      const url = `/api/geo?type=gravity&lat=${latitude}`;
+      const url = `/api/geo?type=gravity&lat=${lat}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -327,8 +412,8 @@ export default function RightSidebar({
 
   // Auto-compute Gravity when Latitude or Elevation changes
   useEffect(() => {
-    if (latitude === 0 && longitude === 0) return; // Don't run on blank start
-    const lat = parseFloat(latitude);
+    const lat = parseFloat(latWgs84 || latitude);
+    if (lat === 0) return; // Don't run on blank start
     const alt = parseFloat(elevation) || 0;
     if (isNaN(lat)) return;
 
@@ -361,6 +446,8 @@ export default function RightSidebar({
         elevation: parseFloat(elevation) || 0,
         latitude: parseFloat(latitude) || 0,
         longitude: parseFloat(longitude) || 0,
+        lat_wgs84: parseFloat(latWgs84) || 0,
+        lon_wgs84: parseFloat(lonWgs84) || 0,
         easting: parseFloat(easting) || 0,
         northing: parseFloat(northing) || 0,
         crs,
@@ -378,7 +465,11 @@ export default function RightSidebar({
         declination_date: declinationDate,
         magnetic_model: magneticModel,
         north_reference: northReference,
-        grid_convergence_used: gridConvergenceUsed
+        grid_convergence_used: gridConvergenceUsed,
+        datum_override: datumOverride,
+        towgs84_dx: parseFloat(towgs84Dx) || 0,
+        towgs84_dy: parseFloat(towgs84Dy) || 0,
+        towgs84_dz: parseFloat(towgs84Dz) || 0
       };
 
       const wellRes = await fetch(`/api/nodes/${wellNode.id}`, {
@@ -429,10 +520,22 @@ export default function RightSidebar({
 
   return (
     <div 
-      className={`relative h-full border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:backdrop-blur-md transition-all duration-300 z-30 flex flex-col shrink-0 ${
-        isOpen ? 'w-64' : 'w-4'
-      }`}
+      className="relative h-full border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:backdrop-blur-md transition-all duration-300 z-30 flex flex-col shrink-0"
+      style={{ width: isOpen ? `${sidebarWidth}px` : '16px' }}
     >
+      {/* Resizer Handle */}
+      {isOpen && (
+        <div
+          className="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-blue-500/20 z-50 transform -translate-x-1/2"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            isResizing.current = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none'; // Prevent text selection while dragging
+          }}
+        />
+      )}
+
       {/* Expand hover trigger for Right edge */}
       {!isOpen && (
         <div 
@@ -573,6 +676,46 @@ export default function RightSidebar({
                       <option key={c.id} value={c.name} />
                     ))}
                   </datalist>
+                </div>
+
+                <div className="space-y-2 bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold cursor-pointer flex items-center gap-1.5" onClick={() => setDatumOverride(!datumOverride)}>
+                      <input type="checkbox" checked={datumOverride} onChange={(e) => setDatumOverride(e.target.checked)} className="rounded border-slate-300 text-blue-500 focus:ring-blue-500" />
+                      Local Datum Shift Override (towgs84)
+                    </label>
+                  </div>
+                  {datumOverride && (
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      <div>
+                        <label className="block text-[9px] text-slate-400">dX (m)</label>
+                        <input
+                          type="number"
+                          value={towgs84Dx}
+                          onChange={(e) => setTowgs84Dx(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-1.5 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right text-[10px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] text-slate-400">dY (m)</label>
+                        <input
+                          type="number"
+                          value={towgs84Dy}
+                          onChange={(e) => setTowgs84Dy(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-1.5 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right text-[10px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] text-slate-400">dZ (m)</label>
+                        <input
+                          type="number"
+                          value={towgs84Dz}
+                          onChange={(e) => setTowgs84Dz(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-1.5 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right text-[10px]"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

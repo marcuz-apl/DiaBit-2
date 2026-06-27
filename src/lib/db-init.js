@@ -118,9 +118,35 @@ export function initDb(db) {
       });
       
       insertManyCrs(epsgAll);
-      console.log(`EPSG registry seeded successfully.`);
-    } catch (err) {
-      console.error("Failed to seed EPSG registry", err);
+      console.log("Seeding universal EPSG index complete.");
+    } catch (e) {
+      console.error("Failed to seed CRS registry:", e);
+    }
+  }
+
+  // 4c. Local Datum Shifts table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS datum_shifts (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      epsg_code        INTEGER UNIQUE,
+      region_name      TEXT NOT NULL,
+      dx               REAL NOT NULL,
+      dy               REAL NOT NULL,
+      dz               REAL NOT NULL
+    );
+  `);
+
+  const datumShiftsCount = db.prepare("SELECT count(*) as count FROM datum_shifts").get().count;
+  if (datumShiftsCount === 0) {
+    try {
+      console.log("Seeding default Datum Shifts...");
+      const insertDatumShift = db.prepare(`
+        INSERT INTO datum_shifts (epsg_code, region_name, dx, dy, dz)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      insertDatumShift.run(23034, 'Libya (ED50)', -87, -96, -120);
+    } catch (e) {
+      console.error("Failed to seed Datum Shifts:", e);
     }
   }
 
