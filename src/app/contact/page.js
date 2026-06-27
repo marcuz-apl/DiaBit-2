@@ -40,7 +40,6 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
-      <title>Contact Us | DiaBit</title>
       
       {/* Top Navbar */}
       <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 dark:border-slate-800 dark:bg-slate-950/80 backdrop-blur-md">
@@ -197,19 +196,16 @@ export default function ContactPage() {
             </div>
           </div>
 
-          {/* Right Column: Google Maps Calgary */}
-          <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-md flex flex-col justify-between backdrop-blur-md relative overflow-hidden group min-h-[400px]">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-blue-500 opacity-50" />
-            <div className="w-full h-full rounded-xl overflow-hidden relative flex-1">
-              <iframe
-                title="Google Maps Calgary"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d160538.74991195655!2d-114.26388487968537!3d51.04473309204368!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x537170030f97e33b%3A0xa37818e99616174!2sCalgary%2C%20AB%2C%20Canada!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"
-                className="w-full h-full border-0 rounded-xl"
-                allowFullScreen=""
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
+          <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-md backdrop-blur-md relative overflow-hidden group h-[400px]">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-blue-500 opacity-50 z-10" />
+            <iframe
+              title="Google Maps Calgary"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d160538.74991195655!2d-114.26388487968537!3d51.04473309204368!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x537170030f97e33b%3A0xa37818e99616174!2sCalgary%2C%20AB%2C%20Canada!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"
+              className="w-full h-full border-0 rounded-xl block"
+              allowFullScreen={true}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
 
         </div>

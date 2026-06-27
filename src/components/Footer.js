@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Globe, Twitter, Linkedin, ShieldAlert, HelpCircle } from 'lucide-react';
+import { Globe, Twitter, Linkedin, ShieldAlert, HelpCircle, Phone } from 'lucide-react';
 
 export default function Footer() {
   const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -37,6 +37,13 @@ export default function Footer() {
 
           {/* Right Corner: Social Links */}
           <div className="flex items-center gap-4 text-slate-400 dark:text-slate-500">
+            <a 
+              href="tel:+15878878048" 
+              className="hover:text-emerald-500 dark:hover:text-emerald-400 transition"
+              title="+1(587)887-8048"
+            >
+              <Phone className="h-4 w-4" />
+            </a>
             <a 
               href="https://www.alfazen.org" 
               target="_blank" 
