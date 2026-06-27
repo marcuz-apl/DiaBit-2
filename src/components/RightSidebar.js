@@ -80,7 +80,11 @@ export default function RightSidebar({
   // Sync selectedCrsObj when the crs string matches an option in the list
   useEffect(() => {
     if (!crs || crsOptions.length === 0) return;
-    const match = crsOptions.find(c => c.name === crs);
+    let match = crsOptions.find(c => c.name === crs);
+    if (!match) {
+      // Forgiving match for legacy strings like "UTM Zone 14N" -> "UTM Zone 14N (WGS84)"
+      match = crsOptions.find(c => c.name.toLowerCase().includes(crs.toLowerCase()));
+    }
     if (match && (!selectedCrsObj || selectedCrsObj.id !== match.id)) {
       setSelectedCrsObj(match);
     }
@@ -91,7 +95,7 @@ export default function RightSidebar({
     if (!selectedCrsObj || selectedCrsObj.projection !== 'utm') return;
     const e = parseFloat(easting);
     const n = parseFloat(northing);
-    if (isNaN(e) || isNaN(n) || e === 0 || n === 0) return;
+    if (isNaN(e) || isNaN(n)) return;
 
     let cancelled = false;
     const convert = async () => {
@@ -244,19 +248,62 @@ export default function RightSidebar({
     }
   }, [activeNode, nodes]);
 
-  const handleAutofillMagnetic = () => {
-    const model = magneticModels.find(m => m.name === magneticModel);
-    if (model) {
-      if (model.default_strength) setMagneticField(model.default_strength);
-      if (model.default_dip) setMagneticDip(model.default_dip);
+  const handleAutofillMagnetic = async () => {
+    if (!latitude || !longitude) {
+      alert("Please ensure Latitude and Longitude are computed first.");
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const url = `/api/geo?type=magnetic&lat=${latitude}&lon=${longitude}&alt=${elevation || 0}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.declination !== undefined) setDeclination(data.declination);
+        if (data.dip !== undefined) setMagneticDip(data.dip);
+        if (data.total_field !== undefined) setMagneticField(data.total_field);
+        setSaveMessage(`Magnetic parameters fetched from ${data.source}`);
+        setSaveError(false);
+        setTimeout(() => setSaveMessage(null), 3000);
+        // Auto-save the fetched values immediately
+        setTimeout(handleSaveSettings, 500);
+      } else {
+        throw new Error("API returned an error");
+      }
+    } catch (err) {
+      setSaveMessage("Failed to fetch magnetic parameters");
+      setSaveError(true);
+      setTimeout(() => setSaveMessage(null), 3000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  // Auto-compute Gravity when Latitude or Elevation changes
+  useEffect(() => {
+    if (latitude === 0 && longitude === 0) return; // Don't run on blank start
+    const lat = parseFloat(latitude);
+    const alt = parseFloat(elevation) || 0;
+    if (isNaN(lat)) return;
+
+    let cancelled = false;
+    const fetchGravity = async () => {
+      try {
+        const res = await fetch(`/api/geo?type=gravity&lat=${lat}&alt=${alt}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (data.gravity_mGal) {
+          setGravityField(data.gravity_mGal);
+        }
+      } catch (e) {}
+    };
+    const t = setTimeout(fetchGravity, 500);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [latitude, elevation]);
+
   const handleAutofillGravity = () => {
-    const model = gravityModels.find(m => m.name === gravityModel);
-    if (model) {
-      if (model.default_strength) setGravityField(model.default_strength);
-    }
+    // This is handled automatically by the useEffect above now.
+    // Retaining this for UI button mapping if it still exists.
   };
 
   const handleSaveSettings = async () => {
@@ -654,9 +701,11 @@ export default function RightSidebar({
                         <button
                           type="button"
                           onClick={handleAutofillMagnetic}
-                          className="text-[9px] text-blue-500 hover:text-blue-400 font-bold cursor-pointer"
+                          disabled={isSaving}
+                          className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 rounded text-[10px] font-medium transition-colors"
                         >
-                          Autofill
+                          <Map className="h-3.5 w-3.5" />
+                          {isSaving ? 'Fetching...' : 'Fetch from Coordinates'}
                         </button>
                       )}
                     </div>
@@ -694,15 +743,18 @@ export default function RightSidebar({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-400 font-normal">Gravity Strength (mGal)</label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={gravityField}
-                      onChange={(e) => setGravityField(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-855 dark:text-slate-100 text-right"
-                    />
-                  </div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="text-[10px] text-slate-400">Strength (mGal)</label>
+                        {latitude !== 0 && <span className="text-[9px] text-amber-500">↻ auto</span>}
+                      </div>
+                      <input
+                        type="number"
+                        step="0.001"
+                        value={gravityField}
+                        onChange={(e) => setGravityField(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-xs text-right font-mono"
+                      />
+                    </div>
                 </div>
 
                 <div>
@@ -711,7 +763,7 @@ export default function RightSidebar({
                     {gravityModel && (
                       <button
                         type="button"
-                        onClick={handleAutofillGravity}
+                        onClick={() => fetchGeoData('gravity')}
                         className="text-[9px] text-blue-500 hover:text-blue-400 font-bold cursor-pointer"
                       >
                         Autofill

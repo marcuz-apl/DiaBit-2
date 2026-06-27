@@ -206,6 +206,9 @@ export default function AdminPage() {
     }
   };
 
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   // If unauthorized
   if (!isAdmin) {
     return (
@@ -230,26 +233,103 @@ export default function AdminPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
-      {/* Top Navbar */}
-      <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 dark:border-slate-800 dark:bg-slate-950/80 backdrop-blur-md">
-        <div className="flex h-14 items-center justify-between px-6 max-w-6xl mx-auto">
-          <Link 
-            href="/"
-            className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Workspace
-          </Link>
-          <span className="font-extrabold text-sm tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent dark:from-blue-400 dark:to-indigo-300">
-            DiaBit Admin Panel
-          </span>
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase">
-            Logged in as: {currentUser?.username}
+  const renderDashboard = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 flex items-center gap-3">
+          <Users className="h-10 w-10 text-blue-500" />
+          <div>
+            <div className="text-[10px] text-slate-450 dark:text-slate-500 uppercase tracking-wider font-bold">Total Accounts</div>
+            <div className="text-xl font-black">{users.length}</div>
           </div>
         </div>
-      </nav>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 flex items-center gap-3">
+          <Database className="h-10 w-10 text-emerald-500" />
+          <div>
+            <div className="text-[10px] text-slate-455 dark:text-slate-500 uppercase tracking-wider font-bold">Hierarchy Nodes</div>
+            <div className="text-xl font-black">{nodes.length}</div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 flex items-center gap-3">
+          <ShieldAlert className="h-10 w-10 text-amber-500" />
+          <div>
+            <div className="text-[10px] text-slate-455 dark:text-slate-500 uppercase tracking-wider font-bold">Database Status</div>
+            <div className="text-xs font-semibold text-emerald-500 flex items-center gap-1 mt-1">
+              <Check className="h-4.5 w-4.5" /> Connected
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
+      {/* Sidebar Navigation */}
+      <div className={`w-64 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 shrink-0 transition-all ${isSidebarOpen ? '' : '-ml-64'}`}>
+        <div className="h-14 flex items-center px-4 border-b border-slate-200 dark:border-slate-800">
+          <span className="font-black text-sm tracking-tight bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent dark:from-blue-400 dark:to-indigo-300">
+            DiaBit Admin
+          </span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'dashboard' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <Database className="h-4 w-4" /> Dashboard
+          </button>
+          <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'users' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <Users className="h-4 w-4" /> User Management
+          </button>
+          <button onClick={() => setActiveTab('nodes')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'nodes' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <Database className="h-4 w-4" /> Node Registry
+          </button>
+          <div className="pt-4 pb-1">
+            <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Reference Data</span>
+          </div>
+          <button onClick={() => setActiveTab('crs')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'crs' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <Map className="h-4 w-4" /> CRS Registry
+          </button>
+          <button onClick={() => setActiveTab('field-models')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'field-models' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <Compass className="h-4 w-4" /> Field Models
+          </button>
+          <button onClick={() => setActiveTab('wmm')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'wmm' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <Sliders className="h-4 w-4" /> WMM Coefficients
+          </button>
+          <div className="pt-4 pb-1">
+            <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">System</span>
+          </div>
+          <button onClick={() => setActiveTab('config')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'config' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <ShieldAlert className="h-4 w-4" /> Configuration
+          </button>
+          <button onClick={() => setActiveTab('messages')} className={`w-full flex items-center gap-2 px-3 py-2 rounded text-xs font-medium transition ${activeTab === 'messages' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'}`}>
+            <Mail className="h-4 w-4" /> Messages
+          </button>
+        </div>
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+          <Link href="/" className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to App
+          </Link>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-14 flex items-center justify-between px-6 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500">
+              <Menu className="h-4 w-4" />
+            </button>
+            <h1 className="text-sm font-bold capitalize text-slate-800 dark:text-slate-200">
+              {activeTab.replace('-', ' ')}
+            </h1>
+          </div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase">
+            Admin: {currentUser?.username}
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'dashboard' && renderDashboard()}
+          {/* We will map the other tabs down here */}
 
       {/* Admin Dashboard Area */}
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
