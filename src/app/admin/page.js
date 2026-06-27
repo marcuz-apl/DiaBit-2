@@ -27,6 +27,7 @@ export default function AdminPage() {
 
   // Settings state variables
   const [autoSaveInterval, setAutoSaveInterval] = useState(3);
+  const [latLonFormat, setLatLonFormat] = useState('decimal');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState({ text: '', isError: false });
 
@@ -74,11 +75,12 @@ export default function AdminPage() {
           setNodes(nData);
         }
 
-        // Fetch auto-save interval settings
+        // Fetch settings
         const settingsRes = await fetch('/api/settings');
         if (settingsRes.ok) {
           const sData = await settingsRes.json();
           setAutoSaveInterval(sData.auto_save_interval || 3);
+          setLatLonFormat(sData.lat_lon_format || 'decimal');
         }
 
         // Fetch contact messages
@@ -205,7 +207,10 @@ export default function AdminPage() {
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auto_save_interval: autoSaveInterval })
+        body: JSON.stringify({ 
+          auto_save_interval: autoSaveInterval,
+          lat_lon_format: latLonFormat
+        })
       });
 
       if (!res.ok) {
@@ -684,6 +689,23 @@ export default function AdminPage() {
                   </select>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
                     Set the inactivity period before modifications on side project wells are auto-saved to database and focus returns to the Working Project.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">
+                    Latitude / Longitude Display Format
+                  </label>
+                  <select
+                    value={latLonFormat}
+                    onChange={(e) => setLatLonFormat(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1.5 text-xs focus:border-blue-500 outline-none text-slate-800 dark:text-slate-100"
+                  >
+                    <option value="decimal">Decimal Degrees (e.g. 29.5678°)</option>
+                    <option value="dms">Degrees, Minutes, Seconds (DMS)</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                    Choose how coordinates are formatted in the Calculation Settings panel.
                   </p>
                 </div>
               </div>

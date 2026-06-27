@@ -174,6 +174,11 @@ export function initDb(db) {
     db.prepare("INSERT INTO settings (key, value) VALUES ('auto_save_interval', '3')").run();
   }
 
+  const formatCount = db.prepare("SELECT count(*) as count FROM settings WHERE key = 'lat_lon_format'").get().count;
+  if (formatCount === 0) {
+    db.prepare("INSERT INTO settings (key, value) VALUES ('lat_lon_format', 'decimal')").run();
+  }
+
   // 5. Create Messages table
   db.exec(`
     CREATE TABLE IF NOT EXISTS messages (

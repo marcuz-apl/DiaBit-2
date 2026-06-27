@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings, Save, Map, Compass, Sliders, Menu, ChevronRight, ChevronLeft, ArrowDown } from 'lucide-react';
+import { decimalToDms, dmsToDecimal } from '@/lib/dms';
 
 export default function RightSidebar({
   activeNode,
@@ -48,6 +49,11 @@ export default function RightSidebar({
   const [saveMessage, setSaveMessage] = useState(null);
   const [saveError, setSaveError] = useState(false);
 
+  // Formatting settings
+  const [latLonFormat, setLatLonFormat] = useState('decimal');
+  const [latDisplay, setLatDisplay] = useState('');
+  const [lonDisplay, setLonDisplay] = useState('');
+
   // Fetch reference field models
   useEffect(() => {
     const fetchModels = async () => {
@@ -62,7 +68,17 @@ export default function RightSidebar({
         console.error('Failed to fetch reference models', err);
       }
     };
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+          const s = await res.json();
+          setLatLonFormat(s.lat_lon_format || 'decimal');
+        }
+      } catch (err) {}
+    };
     fetchModels();
+    fetchSettings();
   }, []);
 
   // Fetch CRS options (filtered by the current crs text the user is typing)
@@ -108,6 +124,8 @@ export default function RightSidebar({
         if (data.lat !== undefined) {
           setLatitude(parseFloat(data.lat.toFixed(6)));
           setLongitude(parseFloat(data.lon.toFixed(6)));
+          setLatDisplay(decimalToDms(data.lat, true));
+          setLonDisplay(decimalToDms(data.lon, false));
           setGridConvergence(parseFloat(data.convergence.toFixed(4)));
           setScaleFactor(parseFloat(data.scaleFactor.toFixed(6)));
         }
@@ -200,6 +218,8 @@ export default function RightSidebar({
       setElevation(meta.elevation || 0);
       setLatitude(meta.latitude || 0);
       setLongitude(meta.longitude || 0);
+      setLatDisplay(decimalToDms(meta.latitude || 0, true));
+      setLonDisplay(decimalToDms(meta.longitude || 0, false));
       setEasting(meta.easting || 0);
       setNorthing(meta.northing || 0);
 
@@ -585,13 +605,26 @@ export default function RightSidebar({
                         <span className="text-[9px] text-amber-500">↻ auto</span>
                       )}
                     </div>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      value={latitude}
-                      onChange={(e) => setLatitude(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
-                    />
+                    {latLonFormat === 'dms' ? (
+                      <input
+                        type="text"
+                        value={latDisplay}
+                        onChange={(e) => setLatDisplay(e.target.value)}
+                        onBlur={() => setLatitude(dmsToDecimal(latDisplay))}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
+                      />
+                    ) : (
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={latitude}
+                        onChange={(e) => {
+                          setLatitude(e.target.value);
+                          setLatDisplay(decimalToDms(parseFloat(e.target.value), true));
+                        }}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
+                      />
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-0.5">
@@ -600,13 +633,26 @@ export default function RightSidebar({
                         <span className="text-[9px] text-amber-500">↻ auto</span>
                       )}
                     </div>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      value={longitude}
-                      onChange={(e) => setLongitude(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
-                    />
+                    {latLonFormat === 'dms' ? (
+                      <input
+                        type="text"
+                        value={lonDisplay}
+                        onChange={(e) => setLonDisplay(e.target.value)}
+                        onBlur={() => setLongitude(dmsToDecimal(lonDisplay))}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
+                      />
+                    ) : (
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={longitude}
+                        onChange={(e) => {
+                          setLongitude(e.target.value);
+                          setLonDisplay(decimalToDms(parseFloat(e.target.value), false));
+                        }}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
+                      />
+                    )}
                   </div>
                 </div>
 
