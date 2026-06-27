@@ -160,41 +160,17 @@ To use the online NOAA API, you must register for a free API key. Without a key,
 
 ### 4.4 Tier 2: WMM2025 Offline Computation (Fallback)
 
-If NOAA is unreachable (4 s timeout) or the API key is missing/invalid, falls back to local spherical harmonic evaluation using WMM2025 Gauss coefficients in the `wmm_coefficients` SQLite table.
+If NOAA is unreachable (4 s timeout) or the API key is missing/invalid, DiaBit falls back to offline evaluation using the industry-standard `geomagnetism` npm package. This package is configured with full WMM2025 Gauss coefficients (degrees n=1–12), ensuring highly accurate fallback calculations that closely match the online NOAA API results.
 
-**Magnetic scalar potential:**
+**Implementation Details:**
+- Uses the `geomagnetism` library in Node.js backend (`src/app/api/geo/route.js`).
+- Coefficients are sourced directly from the `geomagnetism` module dataset (`wmm-2025.json`), replacing the previous truncated (n=1–6) handwritten math model that was stored in the SQLite database.
+- Provides Total Field, Declination, Dip, and Horizontal Intensity seamlessly when offline.
 
-    V(r, θ, λ) = a Σₙ (a/r)^(n+1) Σₘ [gₙᵐ(t) cos(mλ) + hₙᵐ(t) sin(mλ)] Pₙᵐ(cosθ)
+### 4.5 WMM Coefficient Table Schema (Admin Panel Display)
 
-where gₙᵐ(t) = gₙᵐ + ġₙᵐ × (t − t₀) (secular variation update).
-
-**Field components:**
-
-    Bx (north) = −Bθ
-    By (east)  =  Bφ
-    Bz (down)  = −Br
-
-    H = √(Bx² + By²)          (horizontal intensity)
-    F = √(H² + Bz²)           (total field)
-    D = arctan(By / Bx)       (declination, degrees)
-    I = arctan(Bz / H)        (dip angle, degrees)
-
-### 4.5 WMM Coefficient Table Schema
-```sql
-CREATE TABLE IF NOT EXISTS wmm_coefficients (
-  id      INTEGER PRIMARY KEY AUTOINCREMENT,
-  epoch   REAL    NOT NULL,   -- e.g. 2025.0
-  n       INTEGER NOT NULL,   -- degree (1–12)
-  m       INTEGER NOT NULL,   -- order (0–n)
-  g       REAL    NOT NULL,   -- main field (nT)
-  h       REAL    NOT NULL,   -- main field (nT)
-  g_dot   REAL    NOT NULL,   -- secular variation (nT/yr)
-  h_dot   REAL    NOT NULL    -- secular variation (nT/yr)
-);
-```
-
-Seeded from `data/g-m-fields/wmm2025.json` (degrees n=1–6).
-Admin Panel → WMM Coefficients tab allows re-seeding when NOAA publishes a new epoch.
+The Admin Panel **WMM Coefficients** tab dynamically parses and displays the raw 90-term dataset directly from the `geomagnetism` package (degrees n=1–12).
+It iterates through the active model epoch (e.g. 2025.0) and extracts the `main_field_coeff_g/h` and `secular_var_coeff_g/h` for display purposes.
 
 **WMM epochs:** WMM2020 (2020–2025), **WMM2025 (2025–2030 — current)**, WMM2030 (future).
 

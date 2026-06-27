@@ -1,6 +1,6 @@
 {
   "name": "diabit-app",
-  "version": "1.6.5",
+  "version": "1.6.6",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3030",
@@ -13,6 +13,7 @@
   "dependencies": {
     "better-sqlite3": "^12.11.1",
     "epsg-index": "^2.0.0",
+    "geomagnetism": "^0.2.0",
     "lucide-react": "^0.468.0",
     "next": "16.2.9",
     "plotly.js-dist-min": "^3.6.0",

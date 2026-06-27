@@ -729,7 +729,11 @@ export default function AdminPage() {
                 </span>
               </div>
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded text-xs text-blue-800 dark:text-blue-300 leading-relaxed mb-4">
-                <strong>Offline Calculation Engine Active.</strong> The WMM2025 magnetic model coefficients are loaded into the database. These are used as a fallback to calculate Magnetic Declination and Total Field automatically when an internet connection to the NOAA API is unavailable. 
+                <strong>Offline Calculation Engine Active.</strong> The WMM2025 magnetic model coefficients are loaded dynamically into memory. These are used as a fallback to calculate Magnetic Declination and Total Field automatically when an internet connection to the NOAA API is unavailable.
+                <div className="mt-2 text-[11px] text-blue-700/80 dark:text-blue-400/80 flex items-center gap-1.5">
+                  <Database className="h-3 w-3" />
+                  <em>Credits: The current WMM Offline Coefficients and Spherical Harmonic calculations are powered by the open-source <a href="https://github.com/naturalatlas/geomagnetism" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-900 dark:hover:text-blue-200">geomagnetism</a> dataset and library.</em>
+                </div>
               </div>
               <div className="overflow-x-auto max-h-[500px]">
                 <table className="w-full text-left text-xs border-collapse">

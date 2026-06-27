@@ -1,6 +1,6 @@
 import db from '@/lib/database';
-
 import proj4 from 'proj4';
+import geomagnetism from 'geomagnetism';
 
 // ─── Universal Proj4 Coordinate Engine ──────────────────────────────────────
 const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
@@ -67,95 +67,23 @@ function computeGravity(latDeg, altMeters = 0) {
   return parseFloat((gH * 100000).toFixed(4)); // mGal
 }
 
-// ─── WMM offline magnetic computation (simplified spherical harmonic) ────────
-function computeMagnetic(latDeg, lonDeg, altKm, decimalYear) {
-  // Load coefficients from DB
-  const coeffs = db.prepare(`SELECT * FROM wmm_coefficients ORDER BY n, m`).all();
-  if (!coeffs || coeffs.length === 0) return null;
-
-  const phi   = latDeg * Math.PI / 180;         // geocentric (approx for low-order)
-  const lambda = lonDeg * Math.PI / 180;
-  const r = 6371.2 + altKm;                      // geocentric radius (km)
-  const a = 6371.2;                               // reference radius (km)
-  const dt = decimalYear - 2025.0;               // time offset from epoch
-
-  const nMax = Math.max(...coeffs.map(c => c.n));
-
-  // Build coefficient lookup
-  const G = {}, H = {};
-  for (const c of coeffs) {
-    const key = `${c.n}_${c.m}`;
-    G[key] = c.g + c.g_dot * dt;
-    H[key] = c.h + c.h_dot * dt;
-  }
-
-  // Compute Schmidt quasi-normal associated Legendre polynomials
-  function schmidtP(nMax, theta) {
-    const cosT = Math.cos(theta);
-    const sinT = Math.sin(theta);
-    const P = {};
-    P['0_0'] = 1;
-    for (let n = 1; n <= nMax; n++) {
-      for (let m = 0; m <= n; m++) {
-        const key = `${n}_${m}`;
-        if (m === n) {
-          const prev = P[`${n-1}_${n-1}`] || 0;
-          P[key] = sinT * prev * Math.sqrt((2*n - 1) / (2*n));
-        } else if (m === n - 1) {
-          const prev = P[`${n-1}_${m}`] || 0;
-          P[key] = cosT * prev * Math.sqrt(2*n - 1);
-        } else {
-          const k = ((n-1)*(n-1) - m*m) / ((2*n-1)*(2*n-3));
-          const p1 = P[`${n-1}_${m}`] || 0;
-          const p2 = P[`${n-2}_${m}`] || 0;
-          P[key] = cosT * p1 - Math.sqrt(k) * p2;
-          if (m > 0) P[key] *= Math.sqrt((2*n-1) / ((n-m)*(n+m)));
-        }
-      }
+// ─── WMM offline magnetic computation (geomagnetism library) ────────
+function computeMagnetic(latDeg, lonDeg, altKm, dateObj) {
+  try {
+    const info = geomagnetism.model(dateObj).point([latDeg, lonDeg], altKm * 3280.84); // geomagnetism expects altitude in feet
+    if (info) {
+      return {
+        declination: parseFloat(info.decl.toFixed(4)),
+        dip: parseFloat(info.incl.toFixed(4)),
+        total_field: parseFloat(info.f.toFixed(1)),
+        horizontal: parseFloat(info.h.toFixed(1)),
+        source: 'WMM offline (geomagnetism)'
+      };
     }
-    return P;
+  } catch (err) {
+    console.error("Geomagnetism offline calc error:", err);
   }
-
-  const theta = Math.PI / 2 - phi; // colatitude
-  const P = schmidtP(nMax, theta);
-
-  let Br = 0, Btheta = 0, Bphi = 0;
-  for (let n = 1; n <= nMax; n++) {
-    const factor = Math.pow(a / r, n + 2);
-    for (let m = 0; m <= n; m++) {
-      const key = `${n}_${m}`;
-      const g = G[key] || 0;
-      const h = H[key] || 0;
-      const p = P[key] || 0;
-
-      const cosML = Math.cos(m * lambda);
-      const sinML = Math.sin(m * lambda);
-
-      Br     += (n + 1) * factor * (g * cosML + h * sinML) * p;
-      Btheta += factor * (g * cosML + h * sinML) * (P[`${n}_${m+1}`] || 0) * Math.sqrt((n - m) * (n + m + 1) || 1);
-      Bphi   -= factor * m * (-g * sinML + h * cosML) * p;
-    }
-  }
-
-  Bphi /= Math.sin(theta) || 1;
-
-  // Bx = north, By = east, Bz = down
-  const Bx = -Btheta;
-  const By =  Bphi;
-  const Bz = -Br;
-
-  const H_total = Math.sqrt(Bx*Bx + By*By);
-  const F_total = Math.sqrt(H_total*H_total + Bz*Bz);
-  const declinationDeg = Math.atan2(By, Bx) * 180 / Math.PI;
-  const dipDeg = Math.atan2(Bz, H_total) * 180 / Math.PI;
-
-  return {
-    declination: parseFloat(declinationDeg.toFixed(4)),
-    dip: parseFloat(dipDeg.toFixed(4)),
-    total_field: parseFloat(F_total.toFixed(1)),
-    horizontal: parseFloat(H_total.toFixed(1)),
-    source: 'WMM2025 offline'
-  };
+  return null;
 }
 
 // ─── Route handlers ──────────────────────────────────────────────────────────
@@ -264,7 +192,7 @@ export async function GET(request) {
 
       // Offline WMM fallback
       const altKm = alt / 1000;
-      const offlineResult = computeMagnetic(lat, lon, altKm, decimalYear);
+      const offlineResult = computeMagnetic(lat, lon, altKm, d);
       if (offlineResult) {
         return new Response(JSON.stringify(offlineResult), {
           status: 200, headers: { 'Content-Type': 'application/json' }

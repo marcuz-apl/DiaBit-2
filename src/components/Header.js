@@ -237,6 +237,7 @@ export default function Header({ currentUser, onLogin, onLogout }) {
 
             {/* Intro */}
             <p className="text-xs text-slate-300 leading-relaxed mt-4">
+              <strong className="text-white">DiaBit = Drilling Is A Beautiful Interesting Thing!</strong><br /><br />
               DiaBit is a lightweight directional surveying calculations suite designed for oil & gas wellbore planning and tracking. Using the Minimum Curvature Method (MCM), it provides real-time trajectory processing and 3D visualization.
             </p>
 
@@ -250,6 +251,7 @@ export default function Header({ currentUser, onLogin, onLogout }) {
 
             {/* Licensing Note */}
             <div className="text-[10px] text-slate-400 mt-2.5 max-w-xs leading-normal">
+              <span className="text-white">DiaBit is always free for personal use and 5-person Small Business.</span><br />
               For sales or corporate licensing agreements, please contact <a href="mailto:licensing@alfazen.org" className="text-blue-400 hover:text-blue-300 hover:underline">licensing@alfazen.org</a>
             </div>
 
