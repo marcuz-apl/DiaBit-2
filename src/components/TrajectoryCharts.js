@@ -128,45 +128,6 @@ export default function TrajectoryCharts({ planPoints = [], actualPoints = [], i
       },
     },
     legend: { x: 0, y: 1, font: { color: textColor } },
-    updatemenus: [
-      {
-        type: 'buttons',
-        showactive: false,
-        buttons: [
-          {
-            label: 'Zoom to Bottom',
-            method: 'relayout',
-            args: [
-              'scene.camera',
-              {
-                center: { x: 0, y: 0, z: -0.35 },
-                eye: { x: 0.6, y: 0.6, z: -0.2 }
-              }
-            ]
-          },
-          {
-            label: 'Reset',
-            method: 'relayout',
-            args: [
-              'scene.camera',
-              {
-                center: { x: 0, y: 0, z: 0 },
-                eye: { x: 1.25, y: 1.25, z: 1.25 }
-              }
-            ]
-          }
-        ],
-        direction: 'left',
-        pad: { r: 10, t: 10 },
-        x: 1,
-        xanchor: 'right',
-        y: 1.05,
-        yanchor: 'bottom',
-        bgcolor: isDark ? '#1e293b' : '#f1f5f9',
-        bordercolor: isDark ? '#334155' : '#cbd5e1',
-        font: { color: textColor, size: 10 }
-      }
-    ],
   };
 
   // 2. Prepare data for Plan View (Easting vs Northing)
