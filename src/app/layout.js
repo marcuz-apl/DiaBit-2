@@ -19,7 +19,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`} suppressHydrationWarning>
-      <head>
+      <body className="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 font-sans antialiased m-0 p-0">
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -33,8 +33,6 @@ export default function RootLayout({ children }) {
             `,
           }}
         />
-      </head>
-      <body className="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 font-sans antialiased m-0 p-0">
         {children}
       </body>
     </html>

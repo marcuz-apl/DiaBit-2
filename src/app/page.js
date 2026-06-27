@@ -606,7 +606,7 @@ export default function Home() {
             <>
               {/* Stacked Tables */}
               <div className="space-y-6">
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm space-y-3">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm group">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 uppercase tracking-wider">
                       {(activeNode && activeNode.type === 'survey') ? (
@@ -621,22 +621,25 @@ export default function Home() {
                         </>
                       )}
                     </h3>
+                    <span className="text-[10px] text-slate-400 font-medium group-hover:hidden">Hover to expand</span>
                   </div>
-                  <ExcelGrid
-                    nodeId={(activeNode && activeNode.type === 'survey') ? activeNode.id : (defSurvey?.id || null)}
-                    initialPoints={surveyPoints}
-                    unitSystem={units}
-                    vsDirection={vsDirection}
-                    tieIn={((activeNode && activeNode.type === 'survey') ? activeNode.metadata?.tie_in : defSurvey?.metadata?.tie_in) || { md: 0, inc: 0, az: 0, tvd: 0, north: 0, east: 0 }}
-                    totalCorrection={totalCorrection}
-                    onChange={(newPoints) => {
-                      setSurveyPoints(newPoints);
-                    }}
-                    onSaveSuccess={(newPoints) => {
-                      setSurveyPoints(newPoints);
-                      setRefreshTrigger(prev => prev + 1);
-                    }}
-                  />
+                  <div className="hidden group-hover:block mt-3">
+                    <ExcelGrid
+                      nodeId={(activeNode && activeNode.type === 'survey') ? activeNode.id : (defSurvey?.id || null)}
+                      initialPoints={surveyPoints}
+                      unitSystem={units}
+                      vsDirection={vsDirection}
+                      tieIn={((activeNode && activeNode.type === 'survey') ? activeNode.metadata?.tie_in : defSurvey?.metadata?.tie_in) || { md: 0, inc: 0, az: 0, tvd: 0, north: 0, east: 0 }}
+                      totalCorrection={totalCorrection}
+                      onChange={(newPoints) => {
+                        setSurveyPoints(newPoints);
+                      }}
+                      onSaveSuccess={(newPoints) => {
+                        setSurveyPoints(newPoints);
+                        setRefreshTrigger(prev => prev + 1);
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm group">

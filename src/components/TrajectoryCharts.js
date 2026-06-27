@@ -46,14 +46,24 @@ export default function TrajectoryCharts({ planPoints = [], actualPoints = [], i
     const container = containerRef.current;
     if (!container) return;
 
+    let debounceTimer;
     const resizeObserver = new ResizeObserver(() => {
       // Trigger a window resize event so Plotly knows to recalculate sizes
-      window.dispatchEvent(new Event('resize'));
+      // Debounced to prevent Plotly throwing "DOM element null" before it finishes mounting
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        try {
+          window.dispatchEvent(new Event('resize'));
+        } catch (e) {
+          // Ignore plotly internal resize errors
+        }
+      }, 150);
     });
 
     resizeObserver.observe(container);
     return () => {
       resizeObserver.disconnect();
+      clearTimeout(debounceTimer);
     };
   }, [mounted]);
 
