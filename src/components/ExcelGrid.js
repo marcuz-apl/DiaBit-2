@@ -428,8 +428,8 @@ export default function ExcelGrid({
       </div>
 
       {/* Grid Container */}
-      <div className="flex-1 overflow-auto max-h-[350px] md:max-h-[450px]">
-        <table className="w-full text-left border-collapse text-xs select-none">
+      <div className="flex-1 overflow-auto max-h-[350px] md:max-h-[450px] w-full">
+        <table className="w-full min-w-[1000px] text-left border-collapse text-xs select-none">
           <thead>
             <tr className="sticky top-0 bg-slate-100 dark:bg-slate-800/90 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 text-center divide-x divide-slate-200 dark:divide-slate-800">
               <th className="py-2 px-2 w-10">Stn</th>

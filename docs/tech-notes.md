@@ -132,3 +132,25 @@ For spatial coordinate transformation (e.g., Easting/Northing → Lat/Lon), the 
 Because `proj4` outputs spatial coordinates but does not natively expose mapping factors (Convergence and Scale Factor) to the Javascript wrapper, these are computed dynamically via finite differences:
 - A secondary point $1000m$ purely Grid North from the target is projected.
 - The differences in Geodetic coordinates ($d\lambda, d\phi$) are used to compute the angle from True North to Grid North (Convergence $\gamma$) and the proportional distortion (Scale Factor $k$).
+
+---
+
+## 5. Mobile Responsiveness Architecture
+
+The application layout is adapted to function across varying viewport sizes, including smartphones and tablets, while maintaining the primary desktop workspace.
+
+### Main Layout Structure
+- **Flex Direction**: The main workspace container (`src/app/page.js`) employs a responsive flexbox model (`flex-col lg:flex-row`). This allows sidebars and core content to stack vertically on narrow screens and sit side-by-side on wide screens.
+- **Mobile State Routing**: A localized state `mobileSidebar` (`'left'`, `'right'`, or `null`) handles active off-canvas panes on mobile viewports.
+
+### Navigation and Toggle Controls
+- **Header Scaling**: The top `Header` hides text labels on secondary buttons (e.g., About, Sign In) on smaller screens to maximize horizontal real estate, displaying only their respective icons (`hidden sm:inline`).
+- **Hamburger Triggers**: `Menu` and `Settings` toggle buttons are conditionally rendered (`lg:hidden`) in the `Header` to control the visibility of the Left and Right sidebars.
+
+### Off-Canvas Overlays
+- **Desktop Modes**: The `LeftSidebar` and `RightSidebar` act as persistent, fixed-width panes (`lg:static lg:h-full lg:flex-shrink-0`).
+- **Mobile Modes**: On small screens, the sidebars detach from the DOM flow and become absolute overlays (`fixed z-[100] inset-y-0 max-w-[80vw] bg-white dark:bg-slate-900 shadow-2xl transition-transform`).
+- **Backdrop Dismiss**: A semi-transparent backdrop is rendered behind active mobile sidebars to trap focus and allow users to dismiss the pane by tapping outside.
+
+### Data Grid Scrollability
+- The underlying `react-data-grid` (ExcelGrid) components are housed within `overflow-x-auto w-full` containers, ensuring wide tables can be smoothly swiped horizontally without stretching the global page width.

@@ -21,6 +21,7 @@ export default function Home() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [autoSaveMinutes, setAutoSaveMinutes] = useState(3);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [mobileSidebar, setMobileSidebar] = useState(null);
 
   const activeNodeRef = React.useRef(activeNode);
   const nodesRef = React.useRef(nodes);
@@ -517,18 +518,25 @@ export default function Home() {
         currentUser={currentUser} 
         onLogin={handleLogin} 
         onLogout={handleLogout} 
+        onToggleLeftSidebar={() => setMobileSidebar(prev => prev === 'left' ? null : 'left')}
+        onToggleRightSidebar={() => setMobileSidebar(prev => prev === 'right' ? null : 'right')}
       />
 
       {/* Main Body */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-hidden relative">
         
         {/* Left Sidebar (20%) */}
         <LeftSidebar 
           activeNodeId={activeNode?.id} 
-          onSelectNode={setActiveNode} 
+          onSelectNode={(node) => {
+            setActiveNode(node);
+            setMobileSidebar(null);
+          }} 
           refreshTrigger={refreshTrigger}
           isAdmin={currentUser?.role === 'admin'}
           onRefresh={() => setRefreshTrigger(prev => prev + 1)}
+          isOpenMobile={mobileSidebar === 'left'}
+          onCloseMobile={() => setMobileSidebar(null)}
         />
 
         {/* Center Workspace (60%) */}
@@ -686,6 +694,8 @@ export default function Home() {
           onUpdateSettings={() => {
             setRefreshTrigger(prev => prev + 1);
           }}
+          isOpenMobile={mobileSidebar === 'right'}
+          onCloseMobile={() => setMobileSidebar(null)}
         />
 
       </div>

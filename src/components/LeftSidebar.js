@@ -112,7 +112,9 @@ export default function LeftSidebar({
   onSelectNode,
   refreshTrigger,
   isAdmin = false,
-  onRefresh
+  onRefresh,
+  isOpenMobile,
+  onCloseMobile
 }) {
   const [nodes, setNodes] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState({});
@@ -626,12 +628,21 @@ export default function LeftSidebar({
   const rootNodes = buildTree(null);
 
   return (
-    <div 
-      className={`relative h-full border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:backdrop-blur-md z-30 flex flex-col ${
-        isOpen ? '' : 'w-4'
-      } ${isResizing ? '' : 'transition-all duration-300'}`}
-      style={isOpen ? { width: `${width}px` } : {}}
-    >
+    <>
+      {/* Mobile Backdrop */}
+      {isOpenMobile && (
+        <div 
+          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
+          onClick={onCloseMobile}
+        />
+      )}
+      
+      <div 
+        className={`fixed lg:relative inset-y-0 left-0 h-full border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/95 dark:backdrop-blur-md z-50 lg:z-30 flex flex-col transition-transform duration-300 transform lg:transform-none ${
+          isOpenMobile ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        } ${isOpen ? '' : 'lg:w-4'}`}
+        style={isOpen ? { width: `${width}px` } : {}}
+      >
       {/* Expand/Collapse Hover Trigger */}
       {!isOpen && (
         <div 
@@ -807,5 +818,6 @@ export default function LeftSidebar({
         </div>
       )}
     </div>
+    </>
   );
 }

@@ -7,7 +7,9 @@ import { decimalToDms, dmsToDecimal } from '@/lib/dms';
 export default function RightSidebar({
   activeNode,
   nodes = [],
-  onUpdateSettings = () => {}
+  onUpdateSettings = () => {},
+  isOpenMobile,
+  onCloseMobile
 }) {
   const [wellNode, setWellNode] = useState(null);
   const [units, setUnits] = useState('metric');
@@ -522,10 +524,21 @@ export default function RightSidebar({
   const lenLabel = units === 'imperial' ? 'ft' : 'm';
 
   return (
-    <div 
-      className="relative h-full border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:backdrop-blur-md transition-all duration-300 z-30 flex flex-col shrink-0"
-      style={{ width: isOpen ? `${sidebarWidth}px` : '16px' }}
-    >
+    <>
+      {/* Mobile Backdrop */}
+      {isOpenMobile && (
+        <div 
+          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
+          onClick={onCloseMobile}
+        />
+      )}
+
+      <div 
+        className={`fixed lg:relative inset-y-0 right-0 h-full border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/95 dark:backdrop-blur-md transition-transform duration-300 transform lg:transform-none z-50 lg:z-30 flex flex-col shrink-0 ${
+          isOpenMobile ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+        }`}
+        style={isOpen ? { width: `${sidebarWidth}px` } : { width: '16px' }}
+      >
       {/* Resizer Handle */}
       {isOpen && (
         <div
@@ -1119,5 +1132,6 @@ export default function RightSidebar({
         )}
       </div>
     </div>
+    </>
   );
 }

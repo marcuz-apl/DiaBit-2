@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Sun, Moon, User, LogOut, HelpCircle, Info } from 'lucide-react';
+import { Sun, Moon, User, LogOut, HelpCircle, Info, Menu, Settings } from 'lucide-react';
 import pkg from '../../package.json';
 
-export default function Header({ currentUser, onLogin, onLogout }) {
+export default function Header({ currentUser, onLogin, onLogout, onToggleLeftSidebar, onToggleRightSidebar }) {
   const [isDark, setIsDark] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -69,21 +69,27 @@ export default function Header({ currentUser, onLogin, onLogout }) {
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/80 dark:border-slate-800 dark:bg-slate-950/80 backdrop-blur-md">
         <div className="flex h-14 items-center justify-between px-6">
-          {/* Left corner: Help, About */}
-          <div className="flex items-center gap-3">
+          {/* Left corner: Menu (Mobile), Help, About */}
+          <div className="flex items-center gap-1 sm:gap-3">
+            <button 
+              onClick={onToggleLeftSidebar}
+              className="lg:hidden flex items-center p-1.5 text-slate-500 hover:text-blue-500 hover:bg-slate-100 rounded-lg dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-slate-800 transition"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
             <Link 
               href="/help"
-              className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition"
+              className="hidden sm:flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition"
             >
               <HelpCircle className="h-4 w-4" />
-              Help
+              <span>Help</span>
             </Link>
             <button 
               onClick={() => setShowAboutModal(true)}
-              className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition cursor-pointer"
+              className="hidden sm:flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition cursor-pointer"
             >
               <Info className="h-4 w-4" />
-              About
+              <span>About</span>
             </button>
           </div>
 
@@ -133,20 +139,28 @@ export default function Header({ currentUser, onLogin, onLogout }) {
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm transition"
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 px-2 py-1.5 sm:px-3.5 sm:py-1.5 text-xs font-medium text-white shadow-sm transition"
               >
                 <User className="h-4 w-4" />
-                Sign In
+                <span className="hidden sm:inline">Sign In</span>
               </button>
             )}
 
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition"
+              className="hidden sm:flex rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition"
               title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+            </button>
+            
+            {/* Right Sidebar Toggle (Mobile) */}
+            <button 
+              onClick={onToggleRightSidebar}
+              className="lg:hidden flex items-center p-1.5 text-slate-500 hover:text-blue-500 hover:bg-slate-100 rounded-lg dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-slate-800 transition"
+            >
+              <Settings className="h-5 w-5" />
             </button>
           </div>
         </div>
