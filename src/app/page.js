@@ -7,6 +7,7 @@ import LeftSidebar from '@/components/LeftSidebar';
 import RightSidebar from '@/components/RightSidebar';
 import ExcelGrid from '@/components/ExcelGrid';
 import TrajectoryCharts from '@/components/TrajectoryCharts';
+import MetricRibbon from '@/components/MetricRibbon';
 import { Layers, HelpCircle, UserCheck, Database, Disc } from 'lucide-react';
 
 export default function Home() {
@@ -578,63 +579,11 @@ export default function Home() {
           </div>
 
           {/* Dashboard KPI Panel */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 shrink-0">
-            {/* MD Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-blue-500 dark:hover:border-blue-500/50 transition-all duration-200 flex flex-col items-center justify-center text-center cursor-default group select-none relative overflow-hidden">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mb-1">Measured Depth</span>
-              <span className="text-lg font-extrabold text-slate-850 dark:text-white group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
-                {formatVal(lastSurveyPoint?.md)}
-              </span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
-                {workingUnits === 'imperial' ? 'feet' : 'meters'}
-              </span>
-              <div className="absolute bottom-0 left-0 h-1 w-full bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200" />
-            </div>
-
-            {/* Inclination Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-emerald-500 dark:hover:border-emerald-500/50 transition-all duration-200 flex flex-col items-center justify-center text-center cursor-default group select-none relative overflow-hidden">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mb-1">Inclination</span>
-              <span className="text-lg font-extrabold text-slate-850 dark:text-white group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors">
-                {lastSurveyPoint ? `${formatVal(lastSurveyPoint.inclination)}°` : '—'}
-              </span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">degrees</span>
-              <div className="absolute bottom-0 left-0 h-1 w-full bg-emerald-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200" />
-            </div>
-
-            {/* Azimuth Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-amber-500 dark:hover:border-amber-500/50 transition-all duration-200 flex flex-col items-center justify-center text-center cursor-default group select-none relative overflow-hidden">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mb-1">Azimuth</span>
-              <span className="text-lg font-extrabold text-slate-850 dark:text-white group-hover:text-amber-500 dark:group-hover:text-amber-400 transition-colors">
-                {lastSurveyPoint ? `${formatVal(lastSurveyPoint.azimuth)}°` : '—'}
-              </span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">degrees</span>
-              <div className="absolute bottom-0 left-0 h-1 w-full bg-amber-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200" />
-            </div>
-
-            {/* TVD Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-indigo-500 dark:hover:border-indigo-500/50 transition-all duration-200 flex flex-col items-center justify-center text-center cursor-default group select-none relative overflow-hidden">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mb-1">True Vertical Depth</span>
-              <span className="text-lg font-extrabold text-slate-850 dark:text-white group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
-                {formatVal(lastSurveyPoint?.tvd)}
-              </span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
-                {workingUnits === 'imperial' ? 'feet' : 'meters'}
-              </span>
-              <div className="absolute bottom-0 left-0 h-1 w-full bg-indigo-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200" />
-            </div>
-
-            {/* DLS Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-red-500 dark:hover:border-red-500/50 transition-all duration-200 flex flex-col items-center justify-center text-center cursor-default group select-none relative overflow-hidden">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold mb-1">Dogleg Severity</span>
-              <span className="text-lg font-extrabold text-slate-850 dark:text-white group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors">
-                {formatVal(lastSurveyPoint?.dls)}
-              </span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
-                {workingUnits === 'imperial' ? '°/100ft' : '°/30m'}
-              </span>
-              <div className="absolute bottom-0 left-0 h-1 w-full bg-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200" />
-            </div>
-          </div>
+          <MetricRibbon 
+            planStation={planPoints.length > 0 ? planPoints[planPoints.length - 1] : null}
+            surveyStation={surveyPoints.length > 0 ? surveyPoints[surveyPoints.length - 1] : null}
+            unit={workingUnits}
+          />
 
           {/* Data Tables and Plots */}
           {!currentSlot ? (
