@@ -150,6 +150,43 @@ export default function HelpPage() {
           </div>
         </section>
 
+        {/* Section: WMM Offline Coefficients */}
+        <section className="space-y-4 border-t border-slate-200 dark:border-slate-850 pt-6">
+          <h2 className="text-lg font-bold flex items-center gap-2 text-slate-850 dark:text-slate-200">
+            <BookOpen className="h-5 w-5 text-purple-500" />
+            WMM Offline Coefficients (Theory & Practice)
+          </h2>
+          <p className="text-xs text-slate-650 dark:text-slate-400 leading-relaxed">
+            The World Magnetic Model (WMM) is a spherical harmonic representation of the Earth's main magnetic field. DiaBit utilizes this model to provide highly accurate offline magnetic declination corrections.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white border border-slate-200 dark:border-slate-800 dark:bg-slate-900 rounded-xl p-4 shadow-sm text-xs space-y-3">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-200">Theoretical Foundation</h3>
+              <p className="text-slate-650 dark:text-slate-400 leading-relaxed">
+                The Earth's magnetic potential is modeled using <strong>Spherical Harmonics</strong>. The magnetic scalar potential is expanded into a series involving Schmidt semi-normalized associated Legendre functions.
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-650 dark:text-slate-450 pl-2">
+                <li><strong>n &amp; m:</strong> The degree (n) and order (m) of the harmonic expansion (typically up to n=12).</li>
+                <li><strong>g &amp; h:</strong> The static Gauss coefficients for the base epoch (e.g., 2025.0).</li>
+                <li><strong>g_dot &amp; h_dot:</strong> Secular variation coefficients representing the annual rate of change of the magnetic field.</li>
+              </ul>
+            </div>
+
+            <div className="bg-white border border-slate-200 dark:border-slate-800 dark:bg-slate-900 rounded-xl p-4 shadow-sm text-xs space-y-3">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-200">Practical Application in DiaBit</h3>
+              <p className="text-slate-650 dark:text-slate-400 leading-relaxed">
+                When an internet connection to the NOAA API is unavailable, DiaBit's calculation engine falls back to the embedded <code>wmm_coefficients</code> database table.
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-650 dark:text-slate-450 pl-2">
+                <li><strong>Epoch Conversion:</strong> The survey date is converted to a decimal year (e.g., 2026.5). The coefficients are adjusted using <code>g + g_dot * (current_year - base_epoch)</code>.</li>
+                <li><strong>Vector Expansion:</strong> The engine calculates the X (North), Y (East), and Z (Down) magnetic vectors based on the user's Latitude, Longitude, and Elevation.</li>
+                <li><strong>Derived Elements:</strong> Declination (D), Dip (I), and Total Field (F) are mathematically derived from X, Y, and Z to automatically apply Total Correction (TC) to the MWD azimuth.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         {/* Section 3: User Guide */}
         <section className="space-y-4 border-t border-slate-200 dark:border-slate-850 pt-6">
           <h2 className="text-lg font-bold flex items-center gap-2 text-slate-850 dark:text-slate-200">

@@ -1,4 +1,5 @@
 import db from '@/lib/database';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {

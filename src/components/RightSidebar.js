@@ -70,7 +70,7 @@ export default function RightSidebar({
     };
     const fetchSettings = async () => {
       try {
-        const res = await fetch('/api/settings');
+        const res = await fetch('/api/settings', { cache: 'no-store' });
         if (res.ok) {
           const s = await res.json();
           setLatLonFormat(s.lat_lon_format || 'decimal');
@@ -610,7 +610,11 @@ export default function RightSidebar({
                         type="text"
                         value={latDisplay}
                         onChange={(e) => setLatDisplay(e.target.value)}
-                        onBlur={() => setLatitude(dmsToDecimal(latDisplay))}
+                        onBlur={() => {
+                          const dec = dmsToDecimal(latDisplay);
+                          setLatitude(dec);
+                          setLatDisplay(decimalToDms(dec, true));
+                        }}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
                       />
                     ) : (
@@ -638,7 +642,11 @@ export default function RightSidebar({
                         type="text"
                         value={lonDisplay}
                         onChange={(e) => setLonDisplay(e.target.value)}
-                        onBlur={() => setLongitude(dmsToDecimal(lonDisplay))}
+                        onBlur={() => {
+                          const dec = dmsToDecimal(lonDisplay);
+                          setLongitude(dec);
+                          setLonDisplay(decimalToDms(dec, false));
+                        }}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 focus:border-blue-500 outline-none text-slate-850 dark:text-slate-100 text-right"
                       />
                     ) : (

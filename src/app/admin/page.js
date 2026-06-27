@@ -36,7 +36,9 @@ export default function AdminPage() {
 
   // Reference Data state
   const [crsList, setCrsList] = useState([]);
+  const [crsSearchQuery, setCrsSearchQuery] = useState('');
   const [modelsList, setModelsList] = useState([]);
+  const [wmmList, setWmmList] = useState([]);
   const [isFetchingRefData, setIsFetchingRefData] = useState(false);
 
   // Load user and check role
@@ -103,8 +105,8 @@ export default function AdminPage() {
     const fetchRefData = async () => {
       setIsFetchingRefData(true);
       try {
-        if (activeTab === 'crs' && crsList.length === 0) {
-          const res = await fetch('/api/crs');
+        if (activeTab === 'crs') {
+          const res = await fetch(`/api/crs${crsSearchQuery ? '?q=' + encodeURIComponent(crsSearchQuery) : ''}`);
           if (res.ok) setCrsList(await res.json());
         } else if (activeTab === 'field-models' && modelsList.length === 0) {
           const res = await fetch('/api/models');
@@ -112,6 +114,9 @@ export default function AdminPage() {
             const data = await res.json();
             setModelsList([...(data.magnetic || []), ...(data.gravity || [])]);
           }
+        } else if (activeTab === 'wmm' && wmmList.length === 0) {
+          const res = await fetch('/api/wmm');
+          if (res.ok) setWmmList(await res.json());
         }
       } catch (e) {
         console.error("Failed to load reference data", e);
@@ -119,10 +124,10 @@ export default function AdminPage() {
         setIsFetchingRefData(false);
       }
     };
-    if (activeTab === 'crs' || activeTab === 'field-models') {
+    if (activeTab === 'crs' || activeTab === 'field-models' || activeTab === 'wmm') {
       fetchRefData();
     }
-  }, [activeTab, isAdmin]);
+  }, [activeTab, isAdmin, crsSearchQuery]);
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -367,7 +372,7 @@ export default function AdminPage() {
           {activeTab === 'dashboard' && renderDashboard()}
           
           <div className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
-            <div className="space-y-6 max-w-6xl mx-auto text-slate-500 italic p-8 text-center bg-slate-100/50 rounded border border-slate-200">
+            <div className="mt-6 max-w-6xl mx-auto text-slate-500 dark:text-slate-400 italic p-8 text-center bg-slate-100/50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
               Additional dashboard analytics will appear here. Select a tab from the left sidebar to manage data.
             </div>
           </div>
@@ -562,9 +567,18 @@ export default function AdminPage() {
                   <Map className="h-4.5 w-4.5 text-blue-500" />
                   Coordinate Reference Systems
                 </h2>
-                <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 px-2 py-0.5 rounded font-semibold border border-blue-200 dark:border-blue-800/50">
-                  {crsList.length} Zones Pre-Loaded
-                </span>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="text" 
+                    placeholder="Search EPSG (e.g., ED50, 23034)"
+                    value={crsSearchQuery}
+                    onChange={(e) => setCrsSearchQuery(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs focus:border-blue-500 outline-none text-slate-800 dark:text-slate-100 min-w-[200px]"
+                  />
+                  <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 px-2 py-0.5 rounded font-semibold border border-blue-200 dark:border-blue-800/50">
+                    {crsList.length} Zones Pre-Loaded
+                  </span>
+                </div>
               </div>
               <div className="overflow-x-auto max-h-[500px]">
                 <table className="w-full text-left text-xs border-collapse">
@@ -572,8 +586,8 @@ export default function AdminPage() {
                     <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-550 font-bold">
                       <th className="py-2 px-3">EPSG</th>
                       <th className="py-2 px-3">Name</th>
-                      <th className="py-2 px-3">Proj</th>
-                      <th className="py-2 px-3">Meridian</th>
+                      <th className="py-2 px-3">Area</th>
+                      <th className="py-2 px-3">Proj4 String</th>
                       <th className="py-2 px-3 text-center">Status</th>
                     </tr>
                   </thead>
@@ -582,11 +596,11 @@ export default function AdminPage() {
                       <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20">
                         <td className="py-2.5 px-3 text-slate-400 font-mono whitespace-nowrap">{c.epsg_code}</td>
                         <td className="py-2.5 px-3 font-semibold whitespace-nowrap">{c.name}</td>
-                        <td className="py-2.5 px-3 uppercase text-[10px] font-bold text-slate-500">{c.projection}</td>
-                        <td className="py-2.5 px-3 font-mono">{c.central_meridian}</td>
+                        <td className="py-2.5 px-3 text-[10px] text-slate-500 max-w-[200px] truncate" title={c.area}>{c.area}</td>
+                        <td className="py-2.5 px-3 font-mono text-[9px] text-slate-400 max-w-[300px] truncate" title={c.proj4}>{c.proj4}</td>
                         <td className="py-2.5 px-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold ${c.active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/50' : 'bg-slate-100 text-slate-500'}`}>
-                            {c.active ? 'Active' : 'Disabled'}
+                          <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold ${c.active ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 border border-blue-200/50' : 'bg-slate-100 text-slate-500'}`}>
+                            {c.active ? 'Common' : 'Extended'}
                           </span>
                         </td>
                       </tr>
@@ -643,12 +657,43 @@ export default function AdminPage() {
           {/* WMM Coefficients Tab */}
           <div className={activeTab === 'wmm' ? 'block' : 'hidden'}>
             <div className="max-w-6xl mx-auto rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
-                <Sliders className="h-4.5 w-4.5 text-blue-500" />
-                WMM Offline Coefficients
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Sliders className="h-4.5 w-4.5 text-blue-500" />
+                  WMM Offline Coefficients
+                </h2>
+                <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 px-2 py-0.5 rounded font-semibold border border-blue-200 dark:border-blue-800/50">
+                  {wmmList.length} Entries Loaded
+                </span>
+              </div>
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded text-xs text-blue-800 dark:text-blue-300 leading-relaxed mb-4">
                 <strong>Offline Calculation Engine Active.</strong> The WMM2025 magnetic model coefficients are loaded into the database. These are used as a fallback to calculate Magnetic Declination and Total Field automatically when an internet connection to the NOAA API is unavailable. 
+              </div>
+              <div className="overflow-x-auto max-h-[500px]">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900">
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-450 dark:text-slate-550 font-bold">
+                      <th className="py-2 px-3">n</th>
+                      <th className="py-2 px-3">m</th>
+                      <th className="py-2 px-3">g</th>
+                      <th className="py-2 px-3">h</th>
+                      <th className="py-2 px-3">g_dot</th>
+                      <th className="py-2 px-3">h_dot</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {wmmList.map(c => (
+                      <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 font-mono text-slate-500 dark:text-slate-400">
+                        <td className="py-1.5 px-3">{c.n}</td>
+                        <td className="py-1.5 px-3">{c.m}</td>
+                        <td className="py-1.5 px-3">{c.g}</td>
+                        <td className="py-1.5 px-3">{c.h}</td>
+                        <td className="py-1.5 px-3">{c.g_dot}</td>
+                        <td className="py-1.5 px-3">{c.h_dot}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
